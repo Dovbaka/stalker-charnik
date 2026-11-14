@@ -150,14 +150,23 @@ textarea.in { display: block; resize: vertical; line-height: 1.45; }
 .dialog { width: min(100%, 480px); margin-block: auto; outline: none; }
 .dialog > h2 { position: sticky; top: 0; z-index: 1; }
 .hpctl select.in { flex: 1 1 100%; }
-.hpctl .in.w4 { width: 4.2em; }
+.hpctl .in.hpamt { width: 4.2em; flex: none; }
+.hpctl .btn.hurt, .hpctl .btn.heal { flex: 1 1 0; min-width: 0; font-size: 14px; }
+/* damage and healing: muted fills instead of bright outlines */
+.btn.hurt { background: #2e1a15; border-color: #5a2c22; color: #f08a74; }
+.btn.hurt:hover { background: #3a2019; }
+.btn.heal { background: #232a17; border-color: #46532a; color: #c4d67a; }
+.btn.heal:hover { background: #2b341b; }
+/* «Раунд −1» stands as tall as the counter beside it */
+.bleed .btn.hurt { min-height: 36px; padding: 0 10px; font-size: 13px; }
 .chk.off { opacity: .4; cursor: default; }
 .hpnum { font: 400 44px/1 var(--font-m); font-variant-numeric: tabular-nums; }
 .hpnum small { font-size: 18px; color: var(--soft); }
 .pen { font-size: 13px; }
-.meter { position: relative; height: 14px; border: 1px solid var(--ink); }
+/* a thin bar on a dark track; the marks are gaps in it, not bright lines */
+.meter { position: relative; height: 8px; background: var(--head); }
 .meter > i { display: block; height: 100%; }
-.meter > b { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ink); }
+.meter > b { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--box); }
 .meter.l0 > i { background: var(--l0); }
 .meter.l1 > i { background: var(--l1); }
 .meter.l2 > i { background: var(--l2); }
@@ -166,7 +175,7 @@ textarea.in { display: block; resize: vertical; line-height: 1.45; }
 .meter.load > i { background: var(--olive); }
 .meter.load.over > i { background: var(--l2); }
 .meter.load.limit > i { background: var(--l3); }
-.scale { position: relative; height: 14px; font: 11px/14px var(--font-m); color: var(--soft); }
+.scale { position: relative; height: 14px; margin-top: 3px; font: 11px/14px var(--font-m); color: var(--soft); }
 .scale > span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .scale > span.first { transform: none; }
 .scale > span.end { transform: translateX(-100%); }
