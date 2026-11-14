@@ -384,7 +384,8 @@ describe("artefacts", () => {
     const c = simka(); // the leather jacket: one container
     addArtifact(c, art("Бенгальський вогонь"), "b1");
     addArtifact(c, art("Медуза"), "m1");
-    expect(c.artifacts.every(a => !a.on)).toBe(true);
+    expect(c.artifacts.every(a => !a.on && a.secret)).toBe(true);
+    for (const a of c.artifacts) a.secret = false; // the GM has revealed both
     expect(derive(c).eff.spr).toBe(5);
     c.artifacts[0].on = true; c.artifacts[1].on = true;
     expect(artifactStates(c)).toEqual({ b1: "on", m1: "noslot" });
@@ -398,9 +399,22 @@ describe("artefacts", () => {
     expect(derive(c).eff.spr).toBe(5);
     const suit = { ...newArmor(), name: "СЕВА", slots: 4 };
     c.armors.push(suit); wear(c, suit.id);
-    addArtifact(c, art("Бенгальський вогонь"), "b2"); c.artifacts[2].on = true;
+    addArtifact(c, art("Бенгальський вогонь"), "b2"); c.artifacts[2].on = true; c.artifacts[2].secret = false;
     expect(artifactStates(c)).toEqual({ b1: "on", m1: "on", b2: "same" });
     expect(artifactTotals(c)).toMatchObject({ spr: 1, elec: -4, kin: 1, radTurn: 5 });
-    expect(artifactTotals(c, a => a.catId !== art("Медуза").id).radTurn).toBe(0);
+  });
+
+  it("an artefact whose properties are hidden takes a container and does nothing until the GM reveals it", () => {
+    const c = simka();
+    addArtifact(c, art("Бенгальський вогонь"), "b1");
+    c.artifacts[0].on = true;
+    expect(artifactStates(c)).toEqual({ b1: "secret" });
+    expect(derive(c).eff.spr).toBe(5);
+    expect(protection(c).elec).toBe(2);
+    addArtifact(c, art("Медуза"), "m1"); c.artifacts[1].on = true; c.artifacts[1].secret = false;
+    expect(artifactStates(c)).toEqual({ b1: "secret", m1: "noslot" });
+    c.artifacts[0].secret = false;
+    expect(artifactStates(c).b1).toBe("on");
+    expect(derive(c).eff.spr).toBe(6);
   });
 });

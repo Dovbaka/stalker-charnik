@@ -121,9 +121,10 @@ export function takeDamage(c: Character, amount: number, type: DamageType): { re
 export const MAX_SLOTS = 5;
 /** Artefact containers of the worn armour: none without armour, at most five. */
 export const slotsOf = (c: Character) => clamp(Math.round(num(worn(c)?.slots)), 0, MAX_SLOTS);
-export type ArtState = "off" | "on" | "same" | "noslot";
+export type ArtState = "off" | "on" | "same" | "noslot" | "secret";
 /**
  * What each artefact does now. Worn ones fill the containers in list order; one past the last container does nothing ("noslot").
+ * One whose properties the GM still hides takes a container and does nothing until revealed ("secret", owner's call 2026-11-14).
  * Identical artefacts do not add up (the rules), so a second copy takes a container and counts for nothing ("same").
  */
 export function artifactStates(c: Character): Record<string, ArtState> {
@@ -133,6 +134,7 @@ export function artifactStates(c: Character): Record<string, ArtState> {
     if (!a.on) { out[a.id] = "off"; continue; }
     if (used >= cap) { out[a.id] = "noslot"; continue; }
     used++;
+    if (a.secret) { out[a.id] = "secret"; continue; }
     const k = a.catId || a.name.trim().toLowerCase();
     out[a.id] = seen.has(k) ? "same" : "on";
     seen.add(k);
@@ -140,11 +142,11 @@ export function artifactStates(c: Character): Record<string, ArtState> {
   return out;
 }
 export type ArtTotals = Record<ArtFxKey, number>;
-/** What the artefacts that work add up to; `only` narrows it, say to the ones the player knows. */
-export function artifactTotals(c: Character, only: (a: Artifact) => boolean = () => true): ArtTotals {
+/** What the artefacts that work add up to. */
+export function artifactTotals(c: Character): ArtTotals {
   const t = Object.fromEntries(ART_FX_INFO.map(f => [f.key, 0])) as ArtTotals;
   const st = artifactStates(c);
-  for (const a of c.artifacts) if (st[a.id] === "on" && only(a)) for (const f of ART_FX_INFO) t[f.key] += num(a.fx[f.key]);
+  for (const a of c.artifacts) if (st[a.id] === "on") for (const f of ART_FX_INFO) t[f.key] += num(a.fx[f.key]);
   return t;
 }
 /** Armour plus artefacts. Artefacts may take a protection below zero: the wearer then takes that much more. */

@@ -1,6 +1,7 @@
 // The GM's menu: the catalogue players take things from. Only the GM reaches this screen (route /gm).
 // Taking a thing copies it into the sheet, so editing or deleting an entry here never changes anyone's sheet.
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { produce } from "immer";
 import { navigate } from "../router";
 import { DEFAULT_CATALOG, ITEM_FX, gunGroups, itemGroups, newCatArmor, newCatArtifact, newCatGun, newCatItem, type CatArmor, type CatArtifact, type CatGun, type CatItem, type CatKind } from "../rules/catalog";
 import { ART_FX_INFO, ART_RARITY, ART_TYPES, GUN_GROUPS, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName } from "../rules/data";
@@ -19,25 +20,37 @@ export function GmMenu() {
   const [kind, setKind] = useState<CatKind>("guns");
   const [open, setOpen] = useState("");
   const [q, setQ] = useState("");
+  // artefacts change group when their type changes, so they are edited in a dialog over the list, on a draft
+  const [artDlg, setArtDlg] = useState<{ a: CatArtifact; isNew: boolean } | null>(null);
   const cat = st.catalog;
   const status = st.catalogSync === "err" ? "Не збережено" : st.catalogSync === "saving" ? "Зберігаю" : "";
 
   const updGun = (id: string, fn: (x: CatGun) => void) => camp.updateCatalog(c => { const x = c.guns.find(e => e.id === id); if (x) fn(x); });
   const updItem = (id: string, fn: (x: CatItem) => void) => camp.updateCatalog(c => { const x = c.items.find(e => e.id === id); if (x) fn(x); });
   const updArmor = (id: string, fn: (x: CatArmor) => void) => camp.updateCatalog(c => { const x = c.armors.find(e => e.id === id); if (x) fn(x); });
-  const updArt = (id: string, fn: (x: CatArtifact) => void) => camp.updateCatalog(c => { const x = c.artifacts.find(e => e.id === id); if (x) fn(x); });
   const remove = (k: CatKind, id: string) => camp.updateCatalog(c => {
     if (k === "guns") c.guns = c.guns.filter(e => e.id !== id);
     else if (k === "items") c.items = c.items.filter(e => e.id !== id);
     else if (k === "artifacts") c.artifacts = c.artifacts.filter(e => e.id !== id);
     else c.armors = c.armors.filter(e => e.id !== id);
   });
+  /** Saves the dialog's draft. Making properties public reveals them on every sheet that holds a copy. */
+  const saveArt = (a: CatArtifact, was: CatArtifact | null) => {
+    camp.updateCatalog(c => {
+      const i = c.artifacts.findIndex(e => e.id === a.id);
+      if (i >= 0) c.artifacts[i] = a; else c.artifacts.push(a);
+    });
+    if (!a.secret && (!was || was.secret)) {
+      for (const id of Object.keys(st.mine)) camp.update(id, x => { for (const it of x.artifacts) if (it.catId === a.id && it.secret) it.secret = false; });
+    }
+    setArtDlg(null);
+  };
   const add = () => {
+    if (kind === "artifacts") { setArtDlg({ a: newCatArtifact(), isNew: true }); return; }
     let id = "";
     camp.updateCatalog(c => {
       if (kind === "guns") { const e = newCatGun(); id = e.id; c.guns.push(e); }
       else if (kind === "items") { const e = newCatItem(); id = e.id; c.items.push(e); }
-      else if (kind === "artifacts") { const e = newCatArtifact(); id = e.id; c.artifacts.push(e); }
       else { const e = newCatArmor(); id = e.id; c.armors.push(e); }
     });
     setQ(""); setOpen(id);
@@ -93,12 +106,9 @@ export function GmMenu() {
         <div key={t}>
           <div className="wgh lbl">{tn}</div>
           {xs.map(a => (
-            <Entry key={a.id} id={a.id} name={a.n} price={a.p} hidden={!!a.hidden} open={open === a.id} toggle={() => toggle(a.id)}
+            <Entry key={a.id} id={a.id} name={a.n} price={a.p} hidden={!!a.hidden} open={false} toggle={() => setArtDlg({ a, isNew: false })}
               meta={[RARITY_NAME[a.rarity], a.secret ? "властивості приховані" : "властивості відомі"].join(" · ")} extra={a.note}
-              chips={<FxChips fx={a.fx} />}
-              setHidden={v => updArt(a.id, x => { if (v) x.hidden = true; else delete x.hidden; })} remove={() => remove("artifacts", a.id)}>
-              <ArtifactFields a={a} set={fn => updArt(a.id, fn)} />
-            </Entry>
+              chips={<FxChips fx={a.fx} />} setHidden={() => {}} remove={() => {}}>{null}</Entry>
           ))}
         </div>
       );
@@ -138,6 +148,8 @@ export function GmMenu() {
       <Box title={KINDS.find(x => x[0] === kind)![1]}>
         <div>{empty ? <p className="empty">{empty}</p> : body}</div>
       </Box>
+      {artDlg && <ArtifactDialog key={artDlg.a.id} start={artDlg.a} isNew={artDlg.isNew} close={() => setArtDlg(null)}
+        save={a => saveArt(a, artDlg.isNew ? null : artDlg.a)} remove={() => { remove("artifacts", artDlg.a.id); setArtDlg(null); }} />}
       <div className="gmfoot">
         <Confirm sm={false} label="Повернути стандартний каталог" ask="Точно? Усі зміни каталогу зникнуть" title="Повернути стандартний каталог"
           onConfirm={() => { camp.updateCatalog(() => structuredClone(DEFAULT_CATALOG)); setOpen(""); }} />
@@ -250,6 +262,40 @@ function ArmorFields({ a, set }: { a: CatArmor; set: (fn: (x: CatArmor) => void)
   );
 }
 
+/** The artefact form over the list. Changes stay in a draft until «Зберегти»; «Скасувати», × and Escape drop them. */
+function ArtifactDialog({ start, isNew, save, remove, close }: { start: CatArtifact; isNew: boolean; save: (a: CatArtifact) => void; remove: () => void; close: () => void }) {
+  const [a, setA] = useState<CatArtifact>(() => structuredClone(start));
+  const set = (fn: (x: CatArtifact) => void) => setA(prev => produce(prev, fn));
+  const box = useRef<HTMLDivElement>(null);
+  // the parent passes a new close on every render; keep the latest without refocusing the dialog on each keystroke
+  const closeRef = useRef(close);
+  useEffect(() => { closeRef.current = close; });
+  useEffect(() => {
+    box.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeRef.current(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  return (
+    <div className="overlay" role="presentation">
+      <div className="dialog wide box" role="dialog" aria-modal="true" aria-labelledby="art-title" tabIndex={-1} ref={box}>
+        <h2 id="art-title"><span>{isNew ? "Новий артефакт" : "Артефакт"}</span><Btn sm aria-label="Закрити" onClick={close}>×</Btn></h2>
+        <div className="pad">
+          <ArtifactFields a={a} set={set} />
+          <Check checked={!!a.hidden} set={v => set(x => { if (v) x.hidden = true; else delete x.hidden; })}>Приховано від гравців: немає в списку, видає лише майстер</Check>
+          <div className="row between wrapg">
+            <div className="row">
+              <Btn pri onClick={() => save({ ...a, n: a.n.trim() || "Артефакт" })}>{isNew ? "Додати" : "Зберегти"}</Btn>
+              <Btn onClick={close}>Скасувати</Btn>
+            </div>
+            {!isNew && <Confirm sm={false} label="Видалити з каталогу" ask="Точно видалити?" title="Видалити з каталогу" onConfirm={remove} />}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * One artefact. Effects the sheet counts are picked from a list and given a number; only the picked ones show.
  * Anything the sheet cannot count (bleeding, healing) goes in words. New artefacts keep their properties from players.
@@ -259,7 +305,7 @@ function ArtifactFields({ a, set }: { a: CatArtifact; set: (fn: (x: CatArtifact)
   const have = ART_FX_INFO.filter(f => a.fx[f.key] !== undefined), free = ART_FX_INFO.filter(f => a.fx[f.key] === undefined);
   const next = free.find(f => f.key === pick) ?? free[0];
   return (
-    <div className="fgrid">
+    <div className="fgrid artform">
       <Lab name="Назва" wide><Text value={a.n} set={v => set(x => { x.n = v; })} /></Lab>
       <Lab name="Тип"><select className="in" value={a.type} onChange={e => set(x => { x.type = e.target.value as ArtType; })}>{ART_TYPES.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Lab>
       <Lab name="Поширеність"><select className="in" value={a.rarity} onChange={e => set(x => { x.rarity = e.target.value as ArtRarity; })}>{ART_RARITY.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Lab>
@@ -286,7 +332,7 @@ function ArtifactFields({ a, set }: { a: CatArtifact; set: (fn: (x: CatArtifact)
         <div className="hint">Мінус ослаблює: −4 захисту від електрики означає +4 шкоди електрикою. У радіації за хід плюс накопичує, мінус виводить.</div>
       </div>
       <Lab name="Інші ефекти словами" wide><Text value={a.note} placeholder="кровотеча, лікування" set={v => set(x => { x.note = v; })} /></Lab>
-      <Check wide checked={a.secret} set={v => set(x => { x.secret = v; })}>Властивості приховані від гравців</Check>
+      <Check wide checked={a.secret} set={v => set(x => { x.secret = v; })}>Властивості приховані від гравців: поки приховані, артефакт не діє</Check>
     </div>
   );
 }

@@ -349,11 +349,11 @@ function ArtifactsBox({ c, ro, edit, up }: SheetApi) {
   const [buy, setBuy] = useState(false);
   if (ro && c.artifacts.length === 0) return null;
   const states = artifactStates(c), cap = slotsOf(c), armour = worn(c);
-  const used = Object.values(states).filter(x => x === "on" || x === "same").length;
-  // the GM sees everything; a player sees what the GM revealed on this sheet or made public in the catalogue
-  const known = (a: Artifact) => st.gm || !a.secret || st.catalog.artifacts.find(x => x.id === a.catId)?.secret === false;
+  const used = Object.values(states).filter(x => x !== "off" && x !== "noslot").length;
+  // the GM sees everything; a player sees properties once the GM has revealed them (a catalogue reveal reaches every sheet)
+  const known = (a: Artifact) => st.gm || !a.secret;
   const working = c.artifacts.filter(a => states[a.id] === "on");
-  const sum = artifactTotals(c, known), unknownOn = working.some(a => !known(a));
+  const sum = artifactTotals(c);
   const picked = cat.artifacts.find(x => x.id === pick) ?? cat.artifacts[0];
   const add = () => {
     const e = picked;
@@ -381,13 +381,14 @@ function ArtifactsBox({ c, ro, edit, up }: SheetApi) {
               {k ? <><FxChips fx={a.fx} />{a.note && <span className="hint">{a.note}</span>}</> : <span className="hint">Властивості невідомі.</span>}
               {stt === "noslot" && <div className="neg">Не діє: {cap ? `контейнерів лише ${cap}` : "немає вільного контейнера"}.</div>}
               {stt === "same" && <div className="neg">Не діє: такий самий уже працює, однакові не сумуються.</div>}
+              {stt === "secret" && st.gm && <div className="amber">Не діє, доки властивості приховані від гравця.</div>}
               <div className="row between">
                 <Check checked={a.on} disabled={ro || (!a.on && used >= cap)} set={v => up(x => { x.artifacts[i].on = v; })}>У контейнері</Check>
                 {!ro && !edit && <Btn sm pri={isOpen} onClick={() => setOpen(isOpen ? "" : a.id)}>{isOpen ? "Готово" : "Змінити"}</Btn>}
               </div>
               {(edit || isOpen) && !ro && <>
                 {a.d && <span className="hint">{a.d}</span>}
-                {st.gm && <Check checked={!a.secret} set={v => up(x => { x.artifacts[i].secret = !v; })}>Властивості відомі гравцю</Check>}
+                {st.gm && <Check checked={!a.secret} set={v => up(x => { x.artifacts[i].secret = !v; })}>Властивості відомі гравцю: ефекти діють</Check>}
                 <div><Confirm sm={false} label="Викинути" ask="Точно викинути?" title="Викинути артефакт" onConfirm={() => toast(`Викинуто: ${a.name}.`, up(x => { x.artifacts.splice(i, 1); }))} /></div>
               </>}
             </div>
@@ -397,7 +398,6 @@ function ArtifactsBox({ c, ro, edit, up }: SheetApi) {
           <div className="pad artsum">
             <span className="lbl">Разом від артефактів</span>
             <FxChips fx={sum} />
-            {unknownOn && <span className="hint">{ART_FX_INFO.some(f => sum[f.key] !== 0) ? "І ще щось від артефактів із невідомими властивостями." : "Діють артефакти з невідомими властивостями."}</span>}
           </div>
         )}
         {adding && (

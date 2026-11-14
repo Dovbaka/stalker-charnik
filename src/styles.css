@@ -155,6 +155,9 @@ textarea.in { display: block; resize: vertical; line-height: 1.45; }
 .overlay { position: fixed; inset: 0; z-index: 30; background: rgba(8, 10, 6, .72); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .dialog { width: min(100%, 480px); margin-block: auto; outline: none; }
 .dialog > h2 { position: sticky; top: 0; z-index: 1; }
+.dialog.wide { width: min(100%, 560px); }
+/* the artefact form: type and rarity get room for their longest word */
+.fgrid.artform { grid-template-columns: repeat(auto-fit, minmax(9.5em, 1fr)); }
 .hpctl select.in { flex: 1 1 100%; }
 .hpctl .in.hpamt { width: 4.2em; flex: none; }
 .hpctl .btn.hurt, .hpctl .btn.heal { flex: 1 1 0; min-width: 0; font-size: 14px; }
