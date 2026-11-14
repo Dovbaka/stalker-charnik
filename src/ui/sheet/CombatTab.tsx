@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { SKILL_NAME } from "../../rules/data";
-import { FIRE_MODES, SHOT0, hasMod, rangedWeapons, reload, resolveShot, shotCalc, weaponModes, worn, type ShotOpts } from "../../rules/character";
+import { MOD_INFO, SKILL_NAME } from "../../rules/data";
+import { FIRE_MODES, SHOT0, hasMod, quickDraw, rangedWeapons, reload, resolveShot, shotCalc, weaponModes, worn, type ShotOpts } from "../../rules/character";
 import { clamp, cx, num, sign } from "../../util";
 import { Box, Btn, Check, KV, Stepper, Tg, toast, usePersisted } from "../bits";
 import type { SheetApi } from "../Sheet";
@@ -37,7 +37,8 @@ function ShotBox({ c, d, ro, up }: SheetApi) {
   const gun = guns.find(g => g.id === o.weapon);
   const modes = gun ? weaponModes(gun.modes) : FIRE_MODES.map(f => f.key);
   const canOptic = !gun || hasMod(gun, "optic"), canColim = !gun || hasMod(gun, "colim");
-  const extras = gun ? gun.mods.filter(md => md.kind === "other" && num(md.bonus) !== 0) : [];
+  // attachments the shooter switches on: a laser outside automatic fire, and anything with a bonus from the GM
+  const extras = gun ? gun.mods.filter(md => num(md.bonus) !== 0 && (md.kind === "other" || (md.kind === "laser" && o.mode !== "auto"))) : [];
   const toggleMod = (id: string) => set({ mods: o.mods.includes(id) ? o.mods.filter(x => x !== id) : [...o.mods, id] });
   const flag = (key: "sit" | "optic" | "colim" | "nato" | "lying" | "tprone" | "vis" | "invis", text: string, mod: string, disabled = false) =>
     <Tg on={o[key] && !disabled} mod={mod} disabled={disabled} onClick={() => set({ [key]: !saved[key] } as Partial<ShotOpts>)}>{text}</Tg>;
@@ -112,7 +113,7 @@ function ShotBox({ c, d, ro, up }: SheetApi) {
 }
 
 /** Weapons on the body: ammunition, reloading, jams. They are added, edited and put on in «Рюкзак». */
-function GunsBox({ c, ro, up }: SheetApi) {
+function GunsBox({ c, d, ro, up }: SheetApi) {
   const guns = c.weapons.map((g, i) => ({ g, i })).filter(x => x.g.on);
   return (
     <Box title="Зброя на собі" ro={ro}>
@@ -120,11 +121,13 @@ function GunsBox({ c, ro, up }: SheetApi) {
         {guns.length === 0 && <p className="empty">Зброї на собі немає.</p>}
         {guns.map(({ g, i }) => {
           const mag = num(g.mag), cur = clamp(num(g.cur), 0, mag), jams = num(g.jams);
-          const meta = [g.dmg, g.cal, g.nato ? "НАТО +1" : ""].filter(Boolean).join(" · ");
+          const meta = [g.range, g.dmg, g.cal, g.nato ? "НАТО +1" : ""].filter(Boolean).join(" · ");
+          const draw = g.skill === "melee" || g.skill === "unarmed" ? null : Math.round(quickDraw(c, d, g) * 100);
           return (
             <div className="card" key={g.id}>
               <div className="row base wrapg" style={{ minWidth: 0 }}><h3>{g.name}</h3>{meta && <span className="hint num">{meta}</span>}</div>
-              {g.mods.length > 0 && <div className="chips">{g.mods.map(md => <span key={md.id} className="chip">{md.name}</span>)}</div>}
+              {g.mods.length > 0 && <div className="chips">{g.mods.map(md => <span key={md.id} className="chip" title={MOD_INFO[md.kind]?.info || undefined}>{md.name}</span>)}</div>}
+              {draw != null && <div className="hint num">Швидко вихопити: {draw}%</div>}
               {mag > 0 && <>
                 <div className="row wrapg">
                   <span className="ammo">{cur}/{mag}</span>

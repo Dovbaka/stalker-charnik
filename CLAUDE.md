@@ -53,6 +53,10 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 - Luck, health, sleep, food, water, radiation and alcohol come back through one «Відпочити» window in the header (`rules/rest.ts`): it asks the conditions, shows what will change, applies on confirm. No separate dawn buttons.
 - «Рюкзак» holds everything owned: weapons with an «На собі» flag (any number), armours with «Надіта» (one at a time). «Бій» shows only what is on the body.
 - Weapon attachments (`Weapon.mods`): a scope or collimator carries the rules' +1 and is offered in the calculator only for a weapon that has it; "other" attachments carry a GM-set bonus and show only when it is not 0.
+- The GM's earlier rules document (a PDF the owner sent on 2026-11-14, not in the repo) supplied the extra catalogue: pistols, rifles, shotguns, heavy weapons, the bayonet, ammunition for new calibres, explosives, and the weapon features (`MOD_INFO` in `rules/data.ts`). Where it disagrees with the current Google document, the current one wins: scopes +1 at 50 m and further (the earlier said 200 m), current prices. Weapons only the earlier document has carry price 0 and stay out of the creation shop. NATO flags of those weapons are set by origin, because the earlier document marks NATO by colour.
+- Crawling is half the move, rounded up (owner, 2026-11-14).
+- No hint in the sheet speaks to the player ("уточни в майстра", "впиши…"): plain statements only.
+- Tabs lay out in three fixed columns (`.cols` > `.col`), so opening a panel never moves boxes between columns.
 - Done in that pass: luck (pool typed in the wizard, may stay 0; spend 1/3/5; +2 at dawn, +3 in safety, never above the pool; +1 per point and luck rerolls in the shot calculator).
 
 ## Roadmap (agreed with the owner, in this order)

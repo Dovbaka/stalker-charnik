@@ -31,6 +31,8 @@ export interface Weapon {
   mag: number;
   cur: number;
   modes: string;
+  /** Близька, Коротка, Середня, Далека, Екстремальна */
+  range: string;
   w: number;
   cal: string;
   nato: boolean;
@@ -46,7 +48,12 @@ export interface Weapon {
  * An attachment. Scopes and collimators carry the rules' own +1; "other" carries whatever bonus the GM sets,
  * and shows in the shot calculator only when that bonus is not 0. A silencer changes no roll.
  */
-export type ModKind = "optic" | "colim" | "silencer" | "other";
+export type ModKind =
+  | "optic" | "colim" | "laser" | "silencer"        // attachments that change a roll or detection
+  | "grip" | "bulky" | "heavy"                       // handling and calibre
+  | "bayonet" | "bigmag" | "doublemag" | "gl40"      // other attachments from the GM's earlier document
+  | "burst0" | "reliable" | "fragile"                // features of particular weapons
+  | "other";
 export interface WeaponMod { id: string; name: string; kind: ModKind; bonus: number }
 
 export interface Artifact { id: string; name: string; fx: string }

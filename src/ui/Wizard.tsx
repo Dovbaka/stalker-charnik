@@ -101,7 +101,7 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
       );
     };
     const groups: string[] = [];
-    for (const m of MARKET) if (!groups.includes(m.g)) groups.push(m.g);
+    for (const m of MARKET) if (m.p > 0 && !groups.includes(m.g)) groups.push(m.g);
     body = <>
       <h2>Закупись на 4000 купонів</h2>
       <div>
@@ -115,11 +115,11 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
         {groups.map(g => (
           <div key={g}>
             <div className="wgh lbl">{g}</div>
-            {MARKET.map((m, i) => m.g === g ? row("m", i, marketName(m), m.ammo ? "" : [kg(m.w ?? 0) + " кг", m.d].filter(Boolean).join(" · "), m.p) : null)}
+            {MARKET.map((m, i) => m.g === g && m.p > 0 ? row("m", i, marketName(m), m.ammo ? "" : [kg(m.w ?? 0) + " кг", m.d].filter(Boolean).join(" · "), m.p) : null)}
           </div>
         ))}
         <div className="wgh lbl">Зброя</div>
-        {GUNS.map((g, i) => row("g", i, g.n, [g.dmg ? "шкода " + g.dmg : "", g.mag ? "магазин " + g.mag : "", g.cal, kg(g.w) + " кг"].filter(Boolean).join(" · "), g.p))}
+        {GUNS.map((g, i) => g.p <= 0 ? null : row("g", i, g.n, [g.dmg ? "шкода " + g.dmg : "", g.mag ? "магазин " + g.mag : "", g.cal, kg(g.w) + " кг"].filter(Boolean).join(" · "), g.p))}
       </div>
     </>;
   } else {

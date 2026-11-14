@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GUNS, MARKET } from "./data";
-import { SHOT0, addMarketItem, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newArmor, newDraft, rangedWeapons, reload, resolveShot, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem, wear, weaponModes, weightParts, worn } from "./character";
+import { SHOT0, addGun, addMarketItem, quickDraw, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newArmor, newDraft, rangedWeapons, reload, resolveShot, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem, wear, weaponModes, weightParts, worn } from "./character";
 import { decode, encode } from "./codes";
 import type { Character } from "./types";
 
@@ -77,7 +77,7 @@ describe("conditions", () => {
 
   it("the load counts weapons too, and says so", () => {
     const c = simka();
-    c.weapons.push({ id: "g", name: "СВД", skill: "rifles", dmg: "2к10", mag: 10, cur: 10, modes: "напівавтомат", w: 4.3, cal: "7.62×54", nato: false, jams: 0, note: "", on: true, mods: [] });
+    c.weapons.push({ id: "g", name: "СВД", skill: "rifles", dmg: "2к10", mag: 10, cur: 10, modes: "напівавтомат", range: "", w: 4.3, cal: "7.62×54", nato: false, jams: 0, note: "", on: true, mods: [] });
     c.items.push({ id: "a", name: "Бинт", qty: 2, w: 0.1, note: "" });
     expect(weightParts(c)).toEqual({ items: 0.2, weapons: 4.3, armor: 0 });
     c.armors[0].countW = true;
@@ -117,8 +117,8 @@ describe("shooting", () => {
 
   it("a picked weapon sets the skill, NATO bonus, jams and the fire modes it has", () => {
     const c = simka();
-    c.weapons.push({ id: "mp5", name: "MP-5", skill: "rifles", dmg: "к10+1", mag: 30, cur: 30, modes: "напівавтомат, автомат, по 3", w: 2.5, cal: "9×19", nato: true, jams: 1, note: "", on: true, mods: [] });
-    c.weapons.push({ id: "pm", name: "ПМ", skill: "pistols", dmg: "к10", mag: 8, cur: 8, modes: "напівавтомат", w: 0.5, cal: "9×18", nato: false, jams: 0, note: "", on: true, mods: [] });
+    c.weapons.push({ id: "mp5", name: "MP-5", skill: "rifles", dmg: "к10+1", mag: 30, cur: 30, modes: "напівавтомат, автомат, по 3", range: "", w: 2.5, cal: "9×19", nato: true, jams: 1, note: "", on: true, mods: [] });
+    c.weapons.push({ id: "pm", name: "ПМ", skill: "pistols", dmg: "к10", mag: 8, cur: 8, modes: "напівавтомат", range: "", w: 0.5, cal: "9×18", nato: false, jams: 0, note: "", on: true, mods: [] });
     const mp5 = resolveShot(c, { ...SHOT0, weapon: "mp5", mode: "auto" });
     expect(mp5).toMatchObject({ skill: "rifles", nato: true, jam: 1, mode: "auto" });
     expect(resolveShot(c, { ...SHOT0, weapon: "pm", mode: "auto" })).toMatchObject({ skill: "pistols", nato: false, mode: "single" });
@@ -143,7 +143,7 @@ describe("gear", () => {
     addMarketItem(c, ammo); addMarketItem(c, ammo);
     expect(c.items).toHaveLength(1);
     expect(c.items[0].qty).toBe(200);
-    c.weapons.push({ id: "g", name: "ПМ", skill: "pistols", dmg: "к10", mag: 8, cur: 3, modes: "", w: 0.5, cal: "9x18", nato: false, jams: 0, note: "", on: true, mods: [] });
+    c.weapons.push({ id: "g", name: "ПМ", skill: "pistols", dmg: "к10", mag: 8, cur: 3, modes: "", range: "", w: 0.5, cal: "9x18", nato: false, jams: 0, note: "", on: true, mods: [] });
     expect(reload(c, "g")).toContain("Заряджено 5");
     expect(c.weapons[0].cur).toBe(8);
     expect(c.items[0].qty).toBe(195);
@@ -188,15 +188,43 @@ describe("armour and attachments", () => {
 
   it("the calculator offers a scope only for a weapon that has one, and counts the GM's bonus of other attachments", () => {
     const c = simka(), d = derive(c);
-    c.weapons.push({ id: "svd", name: "СВД", skill: "rifles", dmg: "2к10", mag: 10, cur: 10, modes: "напівавтомат", w: 4.3, cal: "7.62×54", nato: false, jams: 0, note: "", on: true,
+    c.weapons.push({ id: "svd", name: "СВД", skill: "rifles", dmg: "2к10", mag: 10, cur: 10, modes: "напівавтомат", range: "", w: 4.3, cal: "7.62×54", nato: false, jams: 0, note: "", on: true,
       mods: [{ id: "sc", name: "Оптичний приціл", kind: "optic", bonus: 1 }, { id: "bp", name: "Сошки", kind: "other", bonus: 1 }] });
-    c.weapons.push({ id: "pm", name: "ПМ", skill: "pistols", dmg: "к10", mag: 8, cur: 8, modes: "напівавтомат", w: 0.5, cal: "9×18", nato: false, jams: 0, note: "", on: true, mods: [] });
-    c.weapons.push({ id: "spare", name: "Запасна", skill: "rifles", dmg: "", mag: 10, cur: 10, modes: "", w: 3, cal: "", nato: false, jams: 0, note: "", on: false, mods: [] });
+    c.weapons.push({ id: "pm", name: "ПМ", skill: "pistols", dmg: "к10", mag: 8, cur: 8, modes: "напівавтомат", range: "", w: 0.5, cal: "9×18", nato: false, jams: 0, note: "", on: true, mods: [] });
+    c.weapons.push({ id: "spare", name: "Запасна", skill: "rifles", dmg: "", mag: 10, cur: 10, modes: "", range: "", w: 3, cal: "", nato: false, jams: 0, note: "", on: false, mods: [] });
     expect(rangedWeapons(c).map(g => g.id)).toEqual(["svd", "pm"]);
     const svd = resolveShot(c, { ...SHOT0, weapon: "svd", optic: true, mods: ["bp"] });
     expect(svd.optic).toBe(true);
     expect(shotCalc(c, d, svd).mod).toBe(5 + 1 + 1);
     expect(resolveShot(c, { ...SHOT0, weapon: "pm", optic: true }).optic).toBe(false);
+  });
+});
+
+describe("weapon features from the GM's earlier document", () => {
+  it("catalogue weapons arrive with their features; a laser counts outside automatic fire; the АН-94 bursts without −1", () => {
+    const c = simka(), d = derive(c);
+    addGun(c, GUNS.find(g => g.n.startsWith("АН-94"))!);
+    addGun(c, GUNS.find(g => g.n.startsWith("Драгунов"))!);
+    const an = c.weapons[0], svd = c.weapons[1];
+    expect(an.mods.map(m => m.kind)).toEqual(["burst0"]);
+    expect(svd.mods.map(m => m.kind)).toEqual(["heavy", "bulky"]);
+    expect(svd.range).toBe("Екстремальна");
+    expect(shotCalc(c, d, resolveShot(c, { ...SHOT0, weapon: an.id, mode: "burst" })).shots.map(s => s.need)).toEqual([4, 4, 4]);
+    an.mods.push({ id: "lz", name: "Лазерний цілевказівник", kind: "laser", bonus: 1 });
+    expect(shotCalc(c, d, resolveShot(c, { ...SHOT0, weapon: an.id, mode: "single", mods: ["lz"] })).mod).toBe(6);
+    expect(shotCalc(c, d, resolveShot(c, { ...SHOT0, weapon: an.id, mode: "auto", mods: ["lz"] })).mod).toBe(5);
+  });
+
+  it("quick draw: bulky makes it harder, an ergonomic grip easier", () => {
+    const c = simka(), d = derive(c);
+    addGun(c, GUNS.find(g => g.n.startsWith("Драгунов"))!);
+    addGun(c, GUNS.find(g => g.n === "Фора-12м")!);
+    expect(quickDraw(c, d, c.weapons[0])).toBeCloseTo(0.8); // (5 + 5 − 2) / 10
+    expect(quickDraw(c, d, c.weapons[1])).toBeCloseTo(0.7); // (0 + 5 + 2) / 10
+  });
+
+  it("weapons saved before ranges existed get an empty one", () => {
+    expect(migrate({ weapons: [{ name: "СВД", skill: "rifles" }] }).weapons[0].range).toBe("");
   });
 });
 

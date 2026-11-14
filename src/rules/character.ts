@@ -1,7 +1,7 @@
 // Everything the rules compute from a sheet. Pure functions: no React, no Firebase.
 // Functions that take a `c` and return nothing mutate it; call them inside an immer recipe.
 import { clamp, num, uid } from "../util";
-import { ATTR_KEYS, ATTR_PTS, CUSTOM_GUN, GUNS, MARKET, RAD_PEN, SKILL_KEYS, SKILL_NAME, SKILL_PTS, START_MONEY, marketName, type GunEntry, type MarketEntry, type ModPreset } from "./data";
+import { ATTR_KEYS, ATTR_PTS, CUSTOM_GUN, GUNS, MARKET, RAD_PEN, SKILL_KEYS, SKILL_NAME, SKILL_PTS, START_MONEY, marketName, modPreset, type GunEntry, type MarketEntry, type ModPreset } from "./data";
 import type { Armor, AttrKey, Character, Item, SkillKey, Weapon } from "./types";
 
 /* ---------- shape ---------- */
@@ -59,6 +59,7 @@ export function migrate(raw: unknown): Character {
   }
   for (const g of s.weapons as Record<string, unknown>[]) {
     if (typeof g.on !== "boolean") g.on = true;
+    if (typeof g.range !== "string") g.range = "";
     g.mods = Array.isArray(g.mods) ? (g.mods as unknown[]).filter(isObj).map(m => ({ id: m.id || uid(), name: String(m.name ?? ""), kind: m.kind ?? "other", bonus: num(m.bonus) })) : [];
   }
   const armors = s.armors as Record<string, unknown>[];
@@ -260,6 +261,15 @@ const gunOf = (c: Character, o: ShotOpts): Weapon | undefined => (o.weapon ? ran
 export const hasMod = (g: Weapon, kind: Weapon["mods"][number]["kind"]) => g.mods.some(m => m.kind === kind);
 
 /**
+ * Chance to draw a weapon quickly: к10 − Спритність must not exceed the weapon skill.
+ * A bulky weapon adds 2 to the die, an ergonomic grip takes 2 off.
+ */
+export function quickDraw(c: Character, d: Derived, g: Weapon): number {
+  const adj = (hasMod(g, "bulky") ? 2 : 0) - (hasMod(g, "grip") ? 2 : 0);
+  return clamp((num(c.skills[g.skill]) + d.eff.spr - adj) / 10, 0, 1);
+}
+
+/**
  * The options as they apply. A picked weapon decides the skill, NATO bonus, jams and fire modes, and a scope or a
  * collimator counts only if the weapon has one.
  */
@@ -290,7 +300,8 @@ export function shotCalc(c: Character, d: Derived, o: ShotOpts): ShotCalc {
   if (o.tprone) P("ціль лежить", -1);
   if (c.mask) P("протигаз", -1);
   for (const md of gunOf(c, o)?.mods ?? []) {
-    if (md.kind === "other" && num(md.bonus) !== 0 && o.mods.includes(md.id)) P(md.name.toLowerCase(), num(md.bonus));
+    if (!o.mods.includes(md.id) || !num(md.bonus)) continue;
+    if (md.kind === "other" || (md.kind === "laser" && o.mode !== "auto")) P(md.name.toLowerCase(), num(md.bonus));
   }
   if (o.vis) P("погана видимість", -2);
   if (o.invis) P("ціль невидима", -3);
@@ -305,7 +316,9 @@ export function shotCalc(c: Character, d: Derived, o: ShotOpts): ShotCalc {
   const reroll = !!rs && rb > 0 && (rs === "any" || rs === o.skill);
   const chance = clamp((mod + 2) / 10, 0, 1);
   const chanceReroll = reroll ? chance + (1 - chance) * clamp((mod + 2 + rb) / 10, 0, 1) : chance;
-  const pens = (FIRE_MODES.find(m => m.key === o.mode) ?? FIRE_MODES[0]).pens;
+  const g = gunOf(c, o);
+  // АН-94 fires its burst of three without the −1
+  const pens = o.mode === "burst" && g && hasMod(g, "burst0") ? [0, 0, 0] : (FIRE_MODES.find(m => m.key === o.mode) ?? FIRE_MODES[0]).pens;
   const shots = pens.map(p => ({ need: 9 - mod - p, chance: clamp((mod + p + 2) / 10, 0, 1) }));
   return { parts, mod, need: 9 - mod, chance, chanceReroll, reroll, rerollBonus: rb, shots };
 }
@@ -328,7 +341,7 @@ export function addMarketItem(c: Character, m: MarketEntry): void {
 }
 export const newMod = (p: ModPreset) => ({ id: uid(), name: p.name, kind: p.kind, bonus: p.bonus });
 export function addGun(c: Character, g: GunEntry = CUSTOM_GUN): void {
-  c.weapons.push({ id: uid(), name: g.n, skill: g.skill, dmg: g.dmg, mag: g.mag, cur: g.mag, modes: g.modes, w: g.w, cal: g.cal, nato: !!g.nato, jams: 0, note: g.note, on: true, mods: (g.mods ?? []).map(newMod) });
+  c.weapons.push({ id: uid(), name: g.n, skill: g.skill, dmg: g.dmg, mag: g.mag, cur: g.mag, modes: g.modes, range: g.range, w: g.w, cal: g.cal, nato: !!g.nato, jams: 0, note: g.note, on: true, mods: (g.mods ?? []).map(k => newMod(modPreset(k))) });
 }
 /** Spends one use of a kit; an emptied kit takes one off the count and opens the next. */
 export function useCharge(it: Item): void {

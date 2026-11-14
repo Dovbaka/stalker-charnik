@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GUNS, MARKET, MOD_KIND_NOTE, MOD_PRESETS, SKILL_NAME, WEAPON_SKILLS, marketName } from "../../rules/data";
+import { GUNS, GUN_GROUPS, MARKET, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName, modPreset } from "../../rules/data";
 import { addGun, addMarketItem, newArmor, newMod, useCharge, useItem, wear, weightParts } from "../../rules/character";
 import type { SkillKey } from "../../rules/types";
 import { cx, fmt, kg, num, uid } from "../../util";
@@ -69,7 +69,7 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
       <div>
         {c.weapons.length === 0 && !adding && <p className="empty">Зброї немає.</p>}
         {c.weapons.map((g, i) => {
-          const meta = [g.dmg, g.cal, g.mag ? `магазин ${g.mag}` : "", g.nato ? "НАТО" : ""].filter(Boolean).join(" · ");
+          const meta = [g.range, g.dmg, g.cal, g.mag ? `магазин ${g.mag}` : "", g.nato ? "НАТО" : ""].filter(Boolean).join(" · ");
           return (
             <div className="card" key={g.id}>
               <div className="row between" style={{ alignItems: "flex-start" }}>
@@ -93,7 +93,8 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
           <div className="addf">
             <div className="row wrapg">
               <select className="in" aria-label="Яку зброю додати" value={pick} onChange={e => setPick(e.target.value)}>
-                <option value="">Своя зброя</option>{GUNS.map((g, i) => <option key={g.n} value={i}>{g.n}, {g.p} куп.</option>)}
+                <option value="">Своя зброя</option>
+                {GUN_GROUPS.map(grp => <optgroup key={grp} label={grp}>{GUNS.map((g, i) => g.g === grp ? <option key={g.n} value={i}>{g.n}{g.p ? `, ${g.p} куп.` : ""}</option> : null)}</optgroup>)}
               </select>
               <Btn pri onClick={add}>Додати</Btn>
               <Btn onClick={() => setAdding(false)}>Скасувати</Btn>
@@ -128,11 +129,8 @@ function WeaponEdit({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
 /** Attachments of one weapon: add from the list or your own, set the GM's bonus, take off. */
 function ModsEditor({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
   const g = c.weapons[i];
-  const [preset, setPreset] = useState("0");
-  const addMod = () => {
-    const p = preset === "own" ? { name: "Модифікація", kind: "other" as const, bonus: 0 } : MOD_PRESETS[Number(preset)];
-    if (p) up(x => { x.weapons[i].mods.push(newMod(p)); });
-  };
+  const [kind, setKind] = useState<(typeof MOD_CHOICES)[number]>("optic");
+  const addMod = () => up(x => { x.weapons[i].mods.push(newMod(kind === "other" ? { name: "Модифікація", kind, bonus: 0 } : modPreset(kind))); });
   return <div className="modsed">
     {g.mods.length === 0 && <span className="hint">Модифікацій немає.</span>}
     {g.mods.map((md, j) => (
@@ -140,13 +138,13 @@ function ModsEditor({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
         {md.kind === "other" ? <Text value={md.name} label="Назва модифікації" set={v => up(x => { x.weapons[i].mods[j].name = v; })} className="grow" /> : <b>{md.name}</b>}
         {md.kind === "other"
           ? <span className="row hint">бонус <Stepper value={num(md.bonus)} min={-5} max={5} show={num(md.bonus) > 0 ? "+" + md.bonus : md.bonus} set={v => up(x => { x.weapons[i].mods[j].bonus = v; })} /></span>
-          : <span className="hint">{MOD_KIND_NOTE[md.kind]}</span>}
+          : <span className="hint">{MOD_INFO[md.kind]?.info}</span>}
         <Confirm title="Зняти модифікацію" onConfirm={() => up(x => { x.weapons[i].mods.splice(j, 1); })} />
       </div>
     ))}
     <div className="row wrapg">
-      <select className="in" aria-label="Яку модифікацію додати" value={preset} onChange={e => setPreset(e.target.value)}>
-        {MOD_PRESETS.map((p, k) => <option key={p.name} value={k}>{p.name}</option>)}<option value="own">Своя модифікація</option>
+      <select className="in" aria-label="Яку модифікацію додати" value={kind} onChange={e => setKind(e.target.value as (typeof MOD_CHOICES)[number])}>
+        {MOD_CHOICES.map(k => <option key={k} value={k}>{MOD_INFO[k].name}</option>)}
       </select>
       <Btn onClick={addMod}>Додати</Btn>
     </div>
@@ -237,7 +235,7 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
           <div className="addf">
             <div className="lbl">З ринку майстра</div>
             <div className="row wrapg">
-              <select className="in" aria-label="Що додати" value={pick} onChange={e => setPick(e.target.value)}>{MARKET.map((m, i) => <option key={i} value={i}>{marketName(m)}, {m.p} куп.</option>)}</select>
+              <select className="in" aria-label="Що додати" value={pick} onChange={e => setPick(e.target.value)}>{MARKET.map((m, i) => <option key={i} value={i}>{marketName(m)}{m.p ? `, ${m.p} куп.` : ""}</option>)}</select>
               <Btn pri onClick={addFromMarket}>Додати</Btn>
             </div>
             <Check checked={buy} set={setBuy}>Купити: списати купони</Check>
