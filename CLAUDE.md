@@ -57,6 +57,9 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 - Crawling is half the move, rounded up (owner, 2026-11-14).
 - No hint in the sheet speaks to the player ("уточни в майстра", "впиши…"): plain statements only.
 - Tabs lay out in three fixed columns (`.cols` > `.col`), so opening a panel never moves boxes between columns.
+- The site is called «S.T.A.L.K.E.R. TTRPG» (tab title, sign-in page, roster header), not «Чарнік сталкера» (owner, 2026-11-14).
+- The sign-in page is variant Б «Периметр» of the mockups (same canvas, second row) in variant А's colours: hazard tape in the line colour at the top and bottom, the amber trefoil, the name, one olive button, nothing else. Advice about Telegram and other in-app browsers appears only in the error after a failed sign-in.
+- The tab icon is the dark trefoil on an amber square: `public/favicon.svg`, and `public/apple-touch-icon.png` is the same at 180 px without rounded corners for iPhones. Redraw the PNG whenever the SVG changes.
 - Done in that pass: luck (pool typed in the wizard, may stay 0; spend 1/3/5; +2 at dawn, +3 in safety, never above the pool; +1 per point and luck rerolls in the shot calculator).
 
 ## Roadmap (agreed with the owner, in this order)

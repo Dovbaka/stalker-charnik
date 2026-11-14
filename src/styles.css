@@ -252,9 +252,17 @@ table { border-collapse: collapse; width: 100%; font-size: 13px; }
 th, td { border: 1px solid var(--line); padding: 5px 7px; text-align: left; vertical-align: top; }
 th { font: 500 11px/1.2 var(--font-d); text-transform: uppercase; letter-spacing: .07em; background: var(--head); }
 
-/* ---------- roster and sign-in ---------- */
-.rt { padding-bottom: 14px; border-bottom: 2px solid var(--ink); }
-.rt h1 { font-size: clamp(32px, 9vw, 52px); line-height: 1.05; letter-spacing: .03em; }
+/* ---------- sign-in: hazard tape at the top and bottom, the trefoil, the name, one button ---------- */
+.login { position: fixed; inset: 0; z-index: 5; overflow-y: auto; display: flex; flex-direction: column; background: var(--bg); padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+.haz { flex: none; height: 22px; background: repeating-linear-gradient(-45deg, var(--line) 0 14px, var(--bg) 14px 28px); }
+.login-c { flex: 1 0 auto; width: 100%; max-width: 440px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; padding: 32px max(24px, env(safe-area-inset-left, 0px)); text-align: center; }
+.login .tre { width: 150px; height: 150px; color: var(--amber); }
+.login h1 { font-size: clamp(40px, 13vw, 64px); line-height: 1; letter-spacing: .04em; }
+.login h1 span { display: block; margin: 14px -.5em 0 0; font: 500 .4em/1 var(--font-d); letter-spacing: .5em; color: var(--soft); }
+.login-go { width: 100%; min-height: 54px; }
+.login-wait { display: grid; place-items: center; font: 14px var(--font-m); color: var(--soft); }
+
+/* ---------- roster ---------- */
 .rgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 14px; align-items: start; padding-top: 14px; }
 .crow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
 .crow:first-child { border-top: 0; }

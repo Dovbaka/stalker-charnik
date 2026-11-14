@@ -80,7 +80,7 @@ export function Roster({ open, hasDraft, startWizard }: { open: (id: string) => 
   return (
     <div>
       <header className="top">
-        <div className="who"><h1>Чарнік сталкера</h1></div>
+        <div className="who"><h1>S.T.A.L.K.E.R. TTRPG</h1></div>
         <div className="top-r"><span className="sync">{st.user?.name}</span><Btn sm onClick={() => camp.signOut()}>Вийти</Btn></div>
       </header>
       {st.error && <div className="warnbar" style={{ marginTop: 12 }}>{st.error}</div>}
