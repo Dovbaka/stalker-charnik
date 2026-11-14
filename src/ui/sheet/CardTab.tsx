@@ -3,7 +3,7 @@ import { ATTRS, RAD_FX, RAD_STAGE, REROLL_OPTIONS, SKILL_GROUPS, SKILL_KEYS } fr
 import { maxHp, setLuckPool } from "../../rules/character";
 import type { AttrKey, RerollSkill } from "../../rules/types";
 import { clamp, cx, num, uid } from "../../util";
-import { Area, Box, Btn, Confirm, Dots, EditNum, KV, Lab, Meter, Stepper, Text } from "../bits";
+import { Area, Box, Btn, Clover, Confirm, Dots, EditNum, KV, Lab, Meter, Stepper, Steps, Text, Trefoil } from "../bits";
 import type { SheetApi } from "../Sheet";
 import { HealthBox, LuckControls } from "./parts";
 
@@ -29,16 +29,16 @@ function Vitals(api: SheetApi) {
       <HealthBox {...api} />
       <div className="trio">
         <button type="button" className={cx("cell", open === "rad" && "on")} aria-expanded={open === "rad"} onClick={() => toggle("rad")}>
-          <span className="lbl">Радіація</span>
+          <span className="cell-h"><span className="lbl">Радіація</span><Trefoil className="ico rad" /></span>
           <span className={cx("v", (c.rad > 0 || d.radStage > 0) && "amber")}>{c.rad}</span>
         </button>
         <button type="button" className={cx("cell", open === "luck" && "on")} aria-expanded={open === "luck"} onClick={() => toggle("luck")}>
-          <span className="lbl">Удача</span>
+          <span className="cell-h"><span className="lbl">Удача</span><Clover className="ico luck" /></span>
           <span className="v">{cur}<small>/{pool}</small></span>
           {pool > 0 && pool <= 12 && <Dots cls="pips" on={cur} of={pool} />}
         </button>
         <button type="button" className={cx("cell", open === "move" && "on")} aria-expanded={open === "move"} onClick={() => toggle("move")}>
-          <span className="lbl">Хід</span>
+          <span className="cell-h"><span className="lbl">Хід</span><Steps className="ico move" /></span>
           <span className={cx("v", spr < num(c.attrs.spr) && "neg")}>{move}<small> м</small></span>
         </button>
       </div>
@@ -54,7 +54,7 @@ function Vitals(api: SheetApi) {
           </div>
         </Box>
       )}
-      {open === "luck" && <Box title="Удача" ro={ro}><LuckControls {...api} /></Box>}
+      {open === "luck" && <Box title="Удача" ro={ro || api.gm}><LuckControls {...api} ro={ro || api.gm} /></Box>}
       {open === "move" && (
         <Box title="Хід">
           <div className="pad">
@@ -75,9 +75,9 @@ function reasons(d: SheetApi["d"], k: AttrKey): string {
   return [...d.lines[k].map(([src, v]) => `${src} ${v > 0 ? "+" : "−"}${Math.abs(v)}`), ...d.halves[k].map(src => `${src} ÷2`)].join(", ");
 }
 
-function AttrsBox({ c, d, ro, edit, up }: SheetApi) {
+function AttrsBox({ c, d, ro, gm, edit, up }: SheetApi) {
   return (
-    <Box title="Характеристики" ro={ro}>
+    <Box title="Характеристики" ro={ro || gm}>
       <div className="attrs">
         {ATTRS.map(a => {
           const base = num(c.attrs[a.key]), v = d.eff[a.key];
@@ -120,7 +120,8 @@ function SkillRow({ name, lvl, edit, set }: { name: string; lvl: number; edit: b
   );
 }
 
-function SkillsBox({ c, ro, edit, up }: SheetApi) {
+function SkillsBox({ c, ro: ro0, gm, edit, up }: SheetApi) {
+  const ro = ro0 || gm;
   const [all, setAll] = useState(false);
   const learned = SKILL_GROUPS.flatMap(g => g.skills).filter(s => num(c.skills[s.key]) > 0);
   const full = all || edit;
@@ -148,7 +149,8 @@ function SkillsBox({ c, ro, edit, up }: SheetApi) {
   );
 }
 
-function AbilBox({ c, ro, edit, up }: SheetApi) {
+function AbilBox({ c, ro: ro0, gm, edit, up }: SheetApi) {
+  const ro = ro0 || gm;
   if (!edit && c.abilities.length === 0) return null;
   const rr = c.reroll ?? { skill: "", bonus: 2 };
   return (

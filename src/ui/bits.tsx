@@ -3,17 +3,25 @@ import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "
 import { clamp, cx, num } from "../util";
 
 /* ---------- toast ---------- */
-const toastSubs = new Set<(m: string) => void>();
-export const toast = (message: string) => { toastSubs.forEach(f => f(message)); };
+interface ToastMsg { text: string; undo?: (() => void) | null }
+const toastSubs = new Set<(m: ToastMsg) => void>();
+/** A short line at the bottom. With `undo` it also offers «Скасувати» for a few seconds, then goes away by itself. */
+export const toast = (text: string, undo?: (() => void) | null) => { toastSubs.forEach(f => f({ text, undo })); };
 export function Toaster() {
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState<ToastMsg | null>(null);
   useEffect(() => {
     let t = 0;
-    const show = (m: string) => { setMsg(m); window.clearTimeout(t); t = window.setTimeout(() => setMsg(""), 3600); };
+    const show = (m: ToastMsg) => { setMsg(m); window.clearTimeout(t); t = window.setTimeout(() => setMsg(null), m.undo ? 4500 : 3600); };
     toastSubs.add(show);
     return () => { toastSubs.delete(show); window.clearTimeout(t); };
   }, []);
-  return msg ? <div className="toast" role="status" aria-live="polite">{msg}</div> : null;
+  if (!msg) return null;
+  return (
+    <div className={cx("toast", msg.undo && "undo")} role="status" aria-live="polite">
+      <span>{msg.text}</span>
+      {msg.undo && <button type="button" className="toast-btn" onClick={() => { msg.undo?.(); setMsg(null); }}>Скасувати</button>}
+    </div>
+  );
 }
 
 /* ---------- a value remembered in this browser ---------- */
@@ -130,6 +138,25 @@ export function KV({ k, children }: { k: ReactNode; children: ReactNode }) {
   return <div className="kv"><span>{k}</span>{children}</div>;
 }
 const BLADE = "M9.53-5.5A11 11 0 0 1 9.53 5.5L3.46 2A4 4 0 0 0 3.46-2Z";
-export function Trefoil() {
-  return <svg className="tre" viewBox="-12 -12 24 24" aria-hidden="true"><g fill="currentColor"><circle r="2.3" />{[90, 210, 330].map(a => <path key={a} d={BLADE} transform={`rotate(${a})`} />)}</g></svg>;
+export function Trefoil({ className = "tre" }: { className?: string }) {
+  return <svg className={className} viewBox="-12 -12 24 24" aria-hidden="true"><g fill="currentColor"><circle r="2.3" />{[90, 210, 330].map(a => <path key={a} d={BLADE} transform={`rotate(${a})`} />)}</g></svg>;
+}
+
+/** A three-leaf clover, the mark of luck. */
+export function Clover({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <g fill="currentColor"><circle cx="12" cy="7" r="4.2" /><circle cx="7.2" cy="13" r="4.2" /><circle cx="16.8" cy="13" r="4.2" /></g>
+      <path d="M12 13c0 4 1 6.5 3 9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Two boot prints, the mark of movement. */
+export function Steps({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <g fill="currentColor"><ellipse cx="7.5" cy="10" rx="3" ry="4.6" /><ellipse cx="7.5" cy="18.3" rx="2.4" ry="2.3" /><ellipse cx="16.5" cy="5.6" rx="3" ry="4.6" /><ellipse cx="16.5" cy="13.9" rx="2.4" ry="2.3" /></g>
+    </svg>
+  );
 }

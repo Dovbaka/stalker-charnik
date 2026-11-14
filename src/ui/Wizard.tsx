@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { ATTRS, ATTR_PTS, GUNS, MARKET, SKILL_GROUPS, SKILL_KEYS, SKILL_NAME, SKILL_PTS, marketName } from "../rules/data";
+import { itemGroups, type Catalog } from "../rules/catalog";
+import { ATTRS, ATTR_PTS, SKILL_GROUPS, SKILL_KEYS, SKILL_NAME, SKILL_PTS, marketName } from "../rules/data";
 import { attrLeft, cartTotals, draftGearList, skillLeft, type Draft } from "../rules/character";
 import { cx, fmt, kg, num } from "../util";
 import { Area, Btn, Lab, NumIn, Stepper, Text, toast } from "./bits";
 
 const STEPS = ["Хто", "Характеристики", "Навички", "Спорядження", "Підсумок"];
 
-export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; change: (fn: (w: Draft) => void) => void; cancel: () => void; finish: () => void }) {
+export function Wizard({ draft: w, cat, change, cancel, finish }: { draft: Draft; cat: Catalog; change: (fn: (w: Draft) => void) => void; cancel: () => void; finish: () => void }) {
   const d = w.d, st = w.step;
   const [sureCancel, setSureCancel] = useState(false);
   useEffect(() => { if (!sureCancel) return; const t = window.setTimeout(() => setSureCancel(false), 4000); return () => window.clearTimeout(t); }, [sureCancel]);
@@ -24,7 +25,7 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
   };
   const tryFinish = () => { if (!d.id.callsign.trim()) { go(0); return; } finish(); };
 
-  const t = cartTotals(w), moneyLeft = d.money - t.cost, cap = d.attrs.til * 10;
+  const t = cartTotals(w, cat), moneyLeft = d.money - t.cost, cap = d.attrs.til * 10;
   const aLeft = attrLeft(d), sLeft = skillLeft(d);
 
   let body;
@@ -91,17 +92,17 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
       </div>
     </>;
   } else if (st === 3) {
-    const row = (kind: "m" | "g", i: number, name: string, meta: string, price: number) => {
-      const q = num(w.cart[kind][i]);
+    // only priced entries are sold at creation
+    const row = (kind: "m" | "g" | "a", id: string, name: string, meta: string, price: number) => {
+      const q = num(w.cart[kind][id]);
       return (
-        <div className={cx("wrow", q > 0 && "has")} key={kind + i}>
+        <div className={cx("wrow", q > 0 && "has")} key={kind + id}>
           <div className="nm"><b>{name}</b><span className="hint num">{price} куп.{meta ? " · " + meta : ""}</span></div>
-          <Stepper value={q} min={0} canInc={price <= moneyLeft} set={v => change(x => { x.cart[kind][i] = v; })} />
+          <Stepper value={q} min={0} canInc={price <= moneyLeft} set={v => change(x => { x.cart[kind][id] = v; })} />
         </div>
       );
     };
-    const groups: string[] = [];
-    for (const m of MARKET) if (m.p > 0 && !groups.includes(m.g)) groups.push(m.g);
+    const items = cat.items.filter(m => m.p > 0), guns = cat.guns.filter(g => g.p > 0), armors = cat.armors.filter(a => a.p > 0);
     body = <>
       <h2>Закупись на 4000 купонів</h2>
       <div>
@@ -112,19 +113,23 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
             <div><b>{cap}</b><span>Без штрафу</span></div><div><b>{kg(cap * 1.5)}</b><span>Межа</span></div>
           </div>
         </div>
-        {groups.map(g => (
+        {itemGroups(items).map(g => (
           <div key={g}>
             <div className="wgh lbl">{g}</div>
-            {MARKET.map((m, i) => m.g === g && m.p > 0 ? row("m", i, marketName(m), m.ammo ? "" : [kg(m.w ?? 0) + " кг", m.d].filter(Boolean).join(" · "), m.p) : null)}
+            {items.map(m => m.g === g ? row("m", m.id, marketName(m), m.ammo ? "" : [kg(m.w ?? 0) + " кг", m.d].filter(Boolean).join(" · "), m.p) : null)}
           </div>
         ))}
+        {armors.length > 0 && <>
+          <div className="wgh lbl">Броня</div>
+          {armors.map(a => row("a", a.id, a.n, [`кін ${a.kin} · кисл ${a.acid} · вог ${a.fire} · ел ${a.elec} · рад ${a.rad}`, kg(a.w) + " кг"].join(" · "), a.p))}
+        </>}
         <div className="wgh lbl">Зброя</div>
-        {GUNS.map((g, i) => g.p <= 0 ? null : row("g", i, g.n, [g.dmg ? "шкода " + g.dmg : "", g.mag ? "магазин " + g.mag : "", g.cal, kg(g.w) + " кг"].filter(Boolean).join(" · "), g.p))}
+        {guns.map(g => row("g", g.id, g.n, [g.dmg ? "шкода " + g.dmg : "", g.mag ? "магазин " + g.mag : "", g.cal, kg(g.w) + " кг"].filter(Boolean).join(" · "), g.p))}
       </div>
     </>;
   } else {
     const skills = SKILL_KEYS.filter(k => num(d.skills[k]) > 0).map(k => `${SKILL_NAME[k]} ${d.skills[k]}`).join(", ") || "жодної";
-    const gear = draftGearList(w).join(", ") || "нічого";
+    const gear = draftGearList(w, cat).join(", ") || "нічого";
     body = <>
       <h2>Перевір і створи</h2>
       <div className="pad">

@@ -25,14 +25,24 @@ export function HealthBox({ c, d, ro, up, combat }: SheetApi & { combat?: boolea
   const amount = () => { const n = Math.round(num(amt, 1)); return n > 0 ? n : 0; };
   const minus = () => {
     const n = amount(); if (!n) return;
+    const was = c.hp;
     if (combat && type !== "none") {
       let res = { real: 0, absorbed: 0 };
-      up(x => { res = takeDamage(x, n, type); });
-      if (res.absorbed) toast(res.real ? `−${res.real} ОЗ, броня зняла ${res.absorbed}.` : "Броня втримала всю шкоду.");
-    } else up(x => setHp(x, x.hp - n));
+      const undo = up(x => { res = takeDamage(x, n, type); });
+      toast(!res.absorbed ? `−${res.real} ОЗ.` : res.real ? `−${res.real} ОЗ, броня зняла ${res.absorbed}.` : "Броня втримала всю шкоду.", undo);
+    } else {
+      let now = was;
+      const undo = up(x => { setHp(x, x.hp - n); now = x.hp; });
+      if (undo) toast(`−${was - now} ОЗ.`, undo);
+    }
     setAmt("");
   };
-  const plus = () => { const n = amount(); if (n) up(x => setHp(x, x.hp + n)); setAmt(""); };
+  const plus = () => {
+    const n = amount(); setAmt(""); if (!n) return;
+    let now = c.hp;
+    const undo = up(x => { setHp(x, x.hp + n); now = x.hp; });
+    if (undo) toast(`+${now - c.hp} ОЗ.`, undo);
+  };
   return (
     <Box title="Здоров'я" ro={ro}>
       <div className="pad">
@@ -67,14 +77,14 @@ const SPENT: Record<LuckUse, string> = { bonus: "+1 до кидка", reroll: "�
 
 /**
  * Spend luck on its three uses. The number itself can be typed over (0..pool) to undo a slip.
- * The pool changes only in «Правити»; luck comes back through «Відпочити».
+ * The pool changes only in «Редагувати»; luck comes back through «Відпочити».
  */
 export function LuckControls({ c, ro, edit, up }: SheetApi) {
   const cur = num(c.luck.cur), pool = num(c.luck.pool);
   const spend = (use: LuckUse) => {
     let ok = false;
-    up(x => { ok = spendLuck(x, use); });
-    if (ok) toast(`Удача: ${SPENT[use]}.`);
+    const undo = up(x => { ok = spendLuck(x, use); });
+    if (ok) toast(`Удача: ${SPENT[use]}.`, undo);
   };
   return (
     <div className="pad">

@@ -1,8 +1,10 @@
 import { produce } from "immer";
 import { useEffect, useState } from "react";
-import { finishDraft, migrate, newDraft, type Draft } from "./rules/character";
+import { finishDraft, migrate, migrateCart, newDraft, type Draft } from "./rules/character";
+import { forViewer } from "./rules/catalog";
 import { navigate, useRoute } from "./router";
 import { useCampaign } from "./state/context";
+import { GmMenu } from "./ui/Gm";
 import { Login } from "./ui/Login";
 import { Roster } from "./ui/Roster";
 import { Sheet } from "./ui/Sheet";
@@ -15,7 +17,7 @@ function loadDraft(): Draft | null {
   try {
     const d = JSON.parse(localStorage.getItem(LS_DRAFT) || "null");
     if (!d || !d.d) return null;
-    return { step: Number(d.step) || 0, d: migrate(d.d), cart: { m: d.cart?.m ?? {}, g: d.cart?.g ?? {} }, ab: { name: String(d.ab?.name ?? ""), text: String(d.ab?.text ?? "") } };
+    return { step: Number(d.step) || 0, d: migrate(d.d), cart: migrateCart(d.cart), ab: { name: String(d.ab?.name ?? ""), text: String(d.ab?.text ?? "") } };
   } catch { return null; }
 }
 const store = (key: string, value: string | null) => { try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* private window */ } };
@@ -39,17 +41,21 @@ export function App() {
   useEffect(() => { if (missing) { toast("Такої картки немає."); navigate({ name: "roster" }, true); } }, [missing]);
 
   if (!st.user) return <Login />;
+  const cat = forViewer(st.catalog, st.gm);
+
+  if (route.name === "gm" && st.gm) return <GmMenu />;
 
   if (route.name === "new") {
     if (!draft) return null;
     return (
       <Wizard
         draft={draft}
+        cat={cat}
         change={changeDraft}
         // leaving the wizard replaces its address, so Back does not return to an empty form
         cancel={() => { navigate({ name: "roster" }, true); setDraft(null); }}
         finish={() => {
-          const id = camp.create(finishDraft(draft));
+          const id = camp.create(finishDraft(draft, cat));
           navigate(id ? { name: "sheet", id, tab: "sheet" } : { name: "roster" }, true);
           setDraft(null);
           if (id) toast("Картку створено.");

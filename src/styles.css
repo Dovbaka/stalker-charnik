@@ -176,6 +176,11 @@ button.cell { cursor: pointer; }
 button.cell:hover { background: var(--head); }
 .cell.on { border-color: var(--ink); background: var(--head); }
 .cell .v { font: 24px/1 var(--font-m); font-variant-numeric: tabular-nums; }
+.cell-h { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.ico { width: 18px; height: 18px; flex: none; }
+.ico.rad { color: var(--amber); }
+.ico.luck { color: var(--olive); }
+.ico.move { color: var(--soft); }
 .cell .v small { font-size: 14px; color: var(--soft); }
 .pips { font-size: 9px; letter-spacing: 2px; color: var(--olive); line-height: 1; }
 .pips .off, .dots .off { color: var(--line); }
@@ -292,5 +297,18 @@ th { font: 500 11px/1.2 var(--font-d); text-transform: uppercase; letter-spacing
 .wnav .mid b { font-weight: 400; font-size: 17px; }
 .sum { display: grid; gap: 4px; }
 
+.toast.undo { display: flex; align-items: center; gap: 14px; text-align: left; padding: 6px 6px 6px 14px; }
+.toast-btn { appearance: none; border: 1px solid var(--bg); background: transparent; color: var(--bg); font: 600 13px/1 var(--font-m); padding: 0 12px; min-height: 36px; border-radius: 2px; cursor: pointer; white-space: nowrap; }
+.toast-btn:hover { background: rgba(0, 0, 0, .08); }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 14px; font: 14px/1.35 var(--font-b); width: max-content; max-width: min(92vw, 440px); z-index: 20; border-radius: 2px; text-align: center; }
 @media (max-width: 420px) { .big { font-size: 34px; } .hpnum { font-size: 40px; } }
+
+/* ---------- the GM's menu ---------- */
+.gmtabs { padding-top: 12px; }
+.gmtabs .tab .num { color: var(--soft); font-size: 12px; margin-left: 4px; }
+.gmtabs .tab.on .num { color: inherit; }
+.gmbar { padding: 12px 0; }
+.gmfoot { padding: 16px 0 8px; }
+.card.hid > .row b { color: var(--soft); }
+.chip.tagc { margin-left: 8px; font-size: 11px; color: var(--amber); vertical-align: 2px; }
+.chip button { appearance: none; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 0 0 0 6px; }

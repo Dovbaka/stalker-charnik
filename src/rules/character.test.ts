@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "./catalog";
 import { GUNS, MARKET } from "./data";
-import { SHOT0, addGun, addMarketItem, quickDraw, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newArmor, newDraft, rangedWeapons, reload, resolveShot, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem, wear, weaponModes, weightParts, worn } from "./character";
+import { SHOT0, migrateCart, addGun, addMarketItem, quickDraw, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newArmor, newDraft, rangedWeapons, reload, resolveShot, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem, wear, weaponModes, weightParts, worn } from "./character";
 import { decode, encode } from "./codes";
 import type { Character } from "./types";
 
@@ -280,8 +281,8 @@ describe("creation", () => {
     w.d.id.callsign = "Тест";
     Object.assign(w.d.attrs, { spr: 4, til: 3, spy: 4, rea: 3, mud: 1 }); // 15 of 16
     w.d.skills.rifles = 5;
-    w.cart.m[0] = 2; // two antirads, 800
-    w.cart.g[0] = 1; // Makarov, 500
+    w.cart.m["m-0"] = 2; // two antirads, 800
+    w.cart.g["g-0"] = 1; // Makarov, 500
     w.ab = { name: "Гостре око", text: "Перекид" };
     expect(cartTotals(w).cost).toBe(1300);
     const c = finishDraft(w);
@@ -292,6 +293,17 @@ describe("creation", () => {
     expect(c.items[0].qty).toBe(2);
     expect(c.weapons[0].name).toBe(GUNS[0].n);
     expect(c.abilities[0].name).toBe("Гостре око");
+  });
+
+  it("reads a basket saved before the catalogue, and buys from the GM's catalogue by id", () => {
+    expect(migrateCart({ m: { "0": 2, "x": 0 }, g: { "3": 1 } })).toEqual({ m: { "m-0": 2 }, g: { "g-3": 1 }, a: {} });
+    const cat = { ...DEFAULT_CATALOG, armors: [{ id: "vest", n: "Бронежилет", kin: 4, acid: 0, fire: 1, elec: 0, rad: 0, w: 6, slots: 0, p: 900 }] };
+    const w = newDraft();
+    w.cart.a.vest = 1;
+    w.cart.m.gone = 3; // an entry the GM has since deleted counts for nothing
+    expect(cartTotals(w, cat)).toEqual({ cost: 900, weight: 6 });
+    const c = finishDraft(w, cat);
+    expect(c.armors.find(a => a.name === "Бронежилет")).toMatchObject({ kin: 4, fire: 1, on: false, countW: true });
   });
 });
 

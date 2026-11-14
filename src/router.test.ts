@@ -5,6 +5,7 @@ describe("routes", () => {
   it("reads every screen from its address", () => {
     expect(parseRoute("/")).toEqual({ name: "roster" });
     expect(parseRoute("/new")).toEqual({ name: "new" });
+    expect(parseRoute("/gm")).toEqual({ name: "gm" });
     expect(parseRoute("/c/abc123")).toEqual({ name: "sheet", id: "abc123", tab: "sheet" });
     expect(parseRoute("/c/abc123/combat")).toEqual({ name: "sheet", id: "abc123", tab: "combat" });
   });
@@ -16,7 +17,7 @@ describe("routes", () => {
   });
 
   it("writes the address back the same way", () => {
-    const routes: Route[] = [{ name: "roster" }, { name: "new" }, { name: "sheet", id: "abc123", tab: "sheet" }, { name: "sheet", id: "abc123", tab: "notes" }];
+    const routes: Route[] = [{ name: "roster" }, { name: "new" }, { name: "gm" }, { name: "sheet", id: "abc123", tab: "sheet" }, { name: "sheet", id: "abc123", tab: "notes" }];
     for (const r of routes) expect(parseRoute(routePath(r))).toEqual(r);
     expect(routePath({ name: "sheet", id: "abc123", tab: "sheet" })).toBe("/c/abc123");
   });

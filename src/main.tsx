@@ -7,18 +7,21 @@ import { CampaignContext } from "./state/context";
 import { Toaster, toast } from "./ui/bits";
 import "./styles.css";
 
-async function backend(): Promise<Backend> {
+async function setup(): Promise<{ be: Backend; gms?: readonly string[] }> {
   // `npm run dev` with ?demo in the address runs on an in-memory server: no Google sign-in, nothing saved.
-  if (import.meta.env.DEV && new URLSearchParams(location.search).has("demo")) {
+  // ?demo&gm signs in as the GM.
+  const q = new URLSearchParams(location.search);
+  if (import.meta.env.DEV && q.has("demo")) {
     const { memoryBackend } = await import("./backend/memory");
-    return memoryBackend({ seed: true });
+    const gms = q.has("gm") ? ["demo-me"] : [];
+    return { be: memoryBackend({ seed: true, gms }), gms };
   }
   const { firebaseBackend } = await import("./backend/firebase");
-  return firebaseBackend();
+  return { be: firebaseBackend() };
 }
 
-backend().then(be => {
-  const campaign = new Campaign(be, toast);
+setup().then(({ be, gms }) => {
+  const campaign = new Campaign(be, toast, gms);
   campaign.start();
   createRoot(document.getElementById("app")!).render(
     <StrictMode>

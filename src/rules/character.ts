@@ -1,7 +1,8 @@
 // Everything the rules compute from a sheet. Pure functions: no React, no Firebase.
 // Functions that take a `c` and return nothing mutate it; call them inside an immer recipe.
 import { clamp, num, uid } from "../util";
-import { ATTR_KEYS, ATTR_PTS, CUSTOM_GUN, GUNS, MARKET, RAD_PEN, SKILL_KEYS, SKILL_NAME, SKILL_PTS, START_MONEY, marketName, modPreset, type GunEntry, type MarketEntry, type ModPreset } from "./data";
+import { DEFAULT_CATALOG, type CatArmor, type Catalog } from "./catalog";
+import { ATTR_KEYS, ATTR_PTS, CUSTOM_GUN, RAD_PEN, SKILL_KEYS, SKILL_NAME, SKILL_PTS, START_MONEY, marketName, modPreset, type GunEntry, type MarketEntry, type ModPreset } from "./data";
 import type { Armor, AttrKey, Character, Item, SkillKey, Weapon } from "./types";
 
 /* ---------- shape ---------- */
@@ -340,6 +341,10 @@ export function addMarketItem(c: Character, m: MarketEntry): void {
   c.items.push(o);
 }
 export const newMod = (p: ModPreset) => ({ id: uid(), name: p.name, kind: p.kind, bonus: p.bonus });
+/** Copies a catalogue armour into the sheet, not worn yet. */
+export function addArmor(c: Character, a: CatArmor, id = uid()): void {
+  c.armors.push({ id, name: a.n, kin: a.kin, acid: a.acid, fire: a.fire, elec: a.elec, rad: a.rad, w: a.w, countW: true, slots: a.slots, on: false });
+}
 export function addGun(c: Character, g: GunEntry = CUSTOM_GUN, id = uid()): void {
   c.weapons.push({ id, name: g.n, skill: g.skill, dmg: g.dmg, mag: g.mag, cur: g.mag, modes: g.modes, range: g.range, w: g.w, cal: g.cal, nato: !!g.nato, jams: 0, note: g.note, on: true, mods: (g.mods ?? []).map(k => newMod(modPreset(k))) });
 }
@@ -402,32 +407,50 @@ export function setLuckPool(c: Character, pool: number): void {
 export interface Draft {
   step: number;
   d: Character;
-  /** how many of each catalogue entry is in the basket, by index */
-  cart: { m: Record<string, number>; g: Record<string, number> };
+  /** how many of each catalogue entry is in the basket, by catalogue id: items, guns, armours */
+  cart: { m: Record<string, number>; g: Record<string, number>; a: Record<string, number> };
   /** an optional backstory ability typed on the first step */
   ab: { name: string; text: string };
 }
-export const newDraft = (): Draft => ({ step: 0, d: blankCharacter(), cart: { m: {}, g: {} }, ab: { name: "", text: "" } });
+export const newDraft = (): Draft => ({ step: 0, d: blankCharacter(), cart: { m: {}, g: {}, a: {} }, ab: { name: "", text: "" } });
 
-export function cartTotals(w: Draft): { cost: number; weight: number } {
+/** A stored basket in today's shape. Baskets saved before the catalogue counted by list position: "3" becomes "m-3". */
+export function migrateCart(raw: unknown): Draft["cart"] {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const fix = (r: unknown, p: string) => Object.fromEntries(Object.entries((r && typeof r === "object" ? r : {}) as Record<string, unknown>)
+    .map(([k, v]) => [/^\d+$/.test(k) ? `${p}-${k}` : k, num(v)] as [string, number]).filter(([, v]) => v > 0));
+  return { m: fix(o.m, "m"), g: fix(o.g, "g"), a: fix(o.a, "a") };
+}
+
+/** Basket lines that still exist in the catalogue, with their entries. */
+function cartLines(w: Draft, cat: Catalog) {
+  const pick = <T extends { id: string }>(r: Record<string, number> | undefined, from: T[]) =>
+    Object.entries(r ?? {}).map(([k, q]) => ({ e: from.find(x => x.id === k), q: num(q) })).filter((x): x is { e: T; q: number } => !!x.e && x.q > 0);
+  return { m: pick(w.cart.m, cat.items), g: pick(w.cart.g, cat.guns), a: pick(w.cart.a, cat.armors) };
+}
+
+export function cartTotals(w: Draft, cat: Catalog = DEFAULT_CATALOG): { cost: number; weight: number } {
+  const l = cartLines(w, cat);
   let cost = 0, weight = 0;
-  for (const i of Object.keys(w.cart.m)) { const m = MARKET[Number(i)], q = num(w.cart.m[i]); if (m && q) { cost += m.p * q; weight += (m.ammo ? 1 : m.w ?? 0) * q; } }
-  for (const i of Object.keys(w.cart.g)) { const g = GUNS[Number(i)], q = num(w.cart.g[i]); if (g && q) { cost += g.p * q; weight += g.w * q; } }
+  for (const { e, q } of l.m) { cost += e.p * q; weight += (e.ammo ? 1 : e.w ?? 0) * q; }
+  for (const { e, q } of l.g) { cost += e.p * q; weight += e.w * q; }
+  for (const { e, q } of l.a) { cost += e.p * q; weight += e.w * q; }
   return { cost, weight };
 }
 export const attrLeft = (c: Character) => ATTR_PTS - attrSpent(c);
 export const skillLeft = (c: Character) => SKILL_PTS - skillSpent(c);
-export const draftGearList = (w: Draft): string[] => [
-  ...Object.keys(w.cart.m).filter(i => num(w.cart.m[i]) > 0).map(i => `${marketName(MARKET[Number(i)])} ×${w.cart.m[i]}`),
-  ...Object.keys(w.cart.g).filter(i => num(w.cart.g[i]) > 0).map(i => `${GUNS[Number(i)].n} ×${w.cart.g[i]}`),
-];
+export function draftGearList(w: Draft, cat: Catalog = DEFAULT_CATALOG): string[] {
+  const l = cartLines(w, cat);
+  return [...l.m.map(({ e, q }) => `${marketName(e)} ×${q}`), ...l.g.map(({ e, q }) => `${e.n} ×${q}`), ...l.a.map(({ e, q }) => `${e.n} ×${q}`)];
+}
 
 /** Turns a finished draft into a sheet: buys the basket, banks leftover points, fills health. */
-export function finishDraft(w: Draft): Character {
+export function finishDraft(w: Draft, cat: Catalog = DEFAULT_CATALOG): Character {
   const c = migrate(w.d);
-  const t = cartTotals(w);
-  for (const i of Object.keys(w.cart.m)) for (let n = 0; n < num(w.cart.m[i]); n++) addMarketItem(c, MARKET[Number(i)]);
-  for (const i of Object.keys(w.cart.g)) for (let n = 0; n < num(w.cart.g[i]); n++) addGun(c, GUNS[Number(i)]);
+  const t = cartTotals(w, cat), l = cartLines(w, cat);
+  for (const { e, q } of l.m) for (let n = 0; n < q; n++) addMarketItem(c, e);
+  for (const { e, q } of l.g) for (let n = 0; n < q; n++) addGun(c, e);
+  for (const { e, q } of l.a) for (let n = 0; n < q; n++) addArmor(c, e);
   c.money = c.money - t.cost;
   c.freeAttr = Math.max(0, attrLeft(c));
   c.freeSkill = Math.max(0, skillLeft(c));

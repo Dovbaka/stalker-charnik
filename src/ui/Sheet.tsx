@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { derive, type Derived } from "../rules/character";
 import type { Character } from "../rules/types";
+import type { Undo } from "../state/campaign";
 import { useCampaign } from "../state/context";
 import { cx } from "../util";
 import { navigate, type SheetTab } from "../router";
@@ -15,12 +16,14 @@ import { RestDialog } from "./sheet/RestDialog";
 export interface SheetApi {
   c: Character;
   d: Derived;
-  /** someone else's sheet: nothing can be changed */
+  /** nothing in this box can be changed: someone else's sheet, or a part of it the GM does not touch */
   ro: boolean;
-  /** "Правити" is on: base numbers and names are editable */
+  /** the GM on another player's sheet: health, radiation, conditions and gear are open, the rest is read-only */
+  gm: boolean;
+  /** «Редагувати» is on: base numbers and names are editable */
   edit: boolean;
-  /** change the sheet; the recipe mutates a draft */
-  up: (recipe: (c: Character) => void) => void;
+  /** change the sheet; the recipe mutates a draft. Returns what puts the change back, for «Скасувати». */
+  up: (recipe: (c: Character) => void) => Undo | null;
 }
 
 const TABS: [SheetTab, string][] = [["sheet", "Картка"], ["combat", "Бій"], ["pack", "Рюкзак"], ["notes", "Нотатки"]];
@@ -50,7 +53,8 @@ export function Sheet({ id, tab }: { id: string; tab: SheetTab }) {
   }, [callsign]);
 
   if (!c || !d) return null;
-  const api: SheetApi = { c, d, ro: !own, edit: own && edit, up: fn => camp.update(id, fn) };
+  const gm = !own && st.gm;
+  const api: SheetApi = { c, d, ro: !own && !gm, gm, edit: own && edit, up: fn => camp.update(id, fn) };
   const owner = st.entries[id]?.ownerName ?? "";
   const current = tab;
   // switching tabs replaces the address: Back leaves the sheet instead of walking through its tabs
@@ -58,10 +62,10 @@ export function Sheet({ id, tab }: { id: string; tab: SheetTab }) {
     <button type="button" key={k} className={cx("tab", current === k && "on")} aria-current={current === k ? "page" : undefined} onClick={() => navigate({ name: "sheet", id, tab: k }, true)}>{n}</button>
   ));
   // Saving is quiet; only a problem is worth a word.
-  const status = !own ? "Лише перегляд" : st.sync === "err" ? "Не збережено" : st.sync === "saving" && !online ? "Без мережі, збережеться потім" : "";
+  const status = !own && !gm ? "Лише перегляд" : st.sync === "err" ? "Не збережено" : st.sync === "saving" && !online ? "Без мережі, збережеться потім" : gm ? "Майстер" : "";
 
   return (
-    <div className={cx("sc-sheet", !own && "ro")}>
+    <div className={cx("sc-sheet", !own && !gm && "ro")}>
       <header className="top">
         <div className="who">
           <h1>{c.id.callsign || "Без позивного"}</h1>
@@ -70,10 +74,10 @@ export function Sheet({ id, tab }: { id: string; tab: SheetTab }) {
         <div className="top-r">
           <span className={`stamp l${d.level}`}>{d.label}</span>
           <div className="row wrapg" style={{ justifyContent: "flex-end" }}>
-            {status && <span className={cx("sync", own && st.sync === "err" && "s-err", own && st.sync === "saving" && "s-saving")}>{status}</span>}
+            {status && <span className={cx("sync", !api.ro && st.sync === "err" && "s-err", !api.ro && st.sync === "saving" && "s-saving")}>{status}</span>}
             <Btn sm onClick={() => navigate({ name: "roster" })}>Персонажі</Btn>
             {own && <Btn sm onClick={() => setResting(true)}>Відпочити</Btn>}
-            {own && <Btn sm pri={edit} onClick={() => setEdit(!edit)}>{edit ? "Готово" : "Правити"}</Btn>}
+            {own && <Btn sm pri={edit} onClick={() => setEdit(!edit)}>{edit ? "Готово" : "Редагувати"}</Btn>}
           </div>
         </div>
       </header>

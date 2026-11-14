@@ -10,7 +10,7 @@ export function CombatTab(api: SheetApi) {
   return <>
     <div className="col">
       <HealthBox {...api} combat />
-      {num(api.c.luck.pool) > 0 && <Box title="Удача" ro={api.ro}><LuckControls {...api} /></Box>}
+      {num(api.c.luck.pool) > 0 && <Box title="Удача" ro={api.ro || api.gm}><LuckControls {...api} ro={api.ro || api.gm} /></Box>}
     </div>
     <div className="col"><ShotBox {...api} /></div>
     <div className="col"><GunsBox {...api} /><ArmorBox {...api} /></div>

@@ -32,8 +32,8 @@ export function RestDialog({ c, up, close }: SheetApi & { close: () => void }) {
   ];
   const shown = rows.filter(x => x[1]);
   const confirm = () => {
-    up(x => { applyRest(x, o); });
-    toast("Відпочинок записано.");
+    const undo = up(x => { applyRest(x, o); });
+    toast("Відпочинок записано.", undo);
     close();
   };
 

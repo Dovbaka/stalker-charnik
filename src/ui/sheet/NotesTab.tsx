@@ -5,8 +5,8 @@ import type { SheetApi } from "../Sheet";
 
 export function NotesTab(api: SheetApi) {
   return <>
-    <div className="col"><NotesBox {...api} />{!api.ro && <SecretBox {...api} />}</div>
-    <div className="col"><AboutBox {...api} /></div>
+    <div className="col"><NotesBox {...api} ro={api.ro || api.gm} />{!api.ro && !api.gm && <SecretBox {...api} />}</div>
+    <div className="col"><AboutBox {...api} ro={api.ro || api.gm} /></div>
     <div className="col"><RulesBox /></div>
   </>;
 }
@@ -24,7 +24,7 @@ function SecretBox({ c }: SheetApi) {
   const [st, camp] = useCampaign();
   const ready = st.secret.ready && st.secret.id === c.cid;
   return (
-    <Box title="Особисте" right={<span className="hint" style={{ textTransform: "none", letterSpacing: 0 }}>бачиш лише ти</span>}>
+    <Box title="Особисте" right={<span className="hint" style={{ textTransform: "none", letterSpacing: 0 }}>приховано від інших</span>}>
       <div className="pad">
         <Area className="ta" rows={6} disabled={!ready} value={ready ? st.secret.text : ""} set={v => camp.setSecret(v)} label="Особисті нотатки" placeholder={ready ? "Таємниці персонажа." : "Завантажую."} />
       </div>
@@ -32,7 +32,7 @@ function SecretBox({ c }: SheetApi) {
   );
 }
 
-/** Who the character is. Edited in place, no "Правити" needed. */
+/** Who the character is. Edited in place, no «Редагувати» needed. */
 function AboutBox({ c, ro, up }: SheetApi) {
   const i = c.id;
   return (

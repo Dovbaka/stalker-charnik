@@ -14,23 +14,26 @@ npm run build        # type-check and build into dist/
 npm run deploy       # build, then publish the site and firestore.rules (needs `npx firebase login` once)
 ```
 
-`http://localhost:5173/?demo` runs on an in-memory backend: no Google sign-in, nothing is saved, one other player's sheet is seeded. Use it to look at the UI and to test by hand.
+`http://localhost:5173/?demo` runs on an in-memory backend: no Google sign-in, nothing is saved, one other player's sheet is seeded. Use it to look at the UI and to test by hand. `?demo&gm` signs in as the GM.
 
 ## Layout
 
-- `src/rules/` — the game's rules as pure TypeScript, no React or Firebase. `data.ts` holds the tables (attributes, skills, market, guns), `character.ts` computes everything from a sheet (`derive`, `shotCalc`, damage, gear, the creation draft), `codes.ts` makes backup codes. Every rule change gets a test in `character.test.ts`.
+- `src/rules/` — the game's rules as pure TypeScript, no React or Firebase. `data.ts` holds the tables (attributes, skills, market, guns), `catalog.ts` the GM's catalogue built on them, `character.ts` computes everything from a sheet (`derive`, `shotCalc`, damage, gear, the creation draft), `codes.ts` makes backup codes. Every rule change gets a test in `character.test.ts`.
 - `src/backend/` — `Backend` interface with two implementations: `firebase.ts` (production) and `memory.ts` (demo and tests).
-- `src/router.ts` — addresses on the History API, no library: `/` roster, `/new` wizard, `/c/{id}` a sheet on Картка, `/c/{id}/combat|pack|notes` the other tabs. Opening a screen pushes an address; switching tabs and leaving the wizard replace it, so Back goes from a sheet to the roster. The query string is kept, so `?demo` survives navigation.
-- `src/state/campaign.ts` — the store outside React: sign-in, all sheets, my sheets being edited, debounced saves, private notes. Components read it with `useCampaign()`.
-- `src/ui/` — screens. `bits.tsx` has the shared controls. `Sheet.tsx` is the frame, `sheet/*Tab.tsx` are its four tabs. Each box of the sheet gets a `SheetApi` (`c`, `d`, `ro`, `edit`, `up`).
+- `src/roles.ts` — the GM's Firebase Auth user id and the sheet fields the GM may change. `firestore.rules` repeats both lists; change them together. The GM is named by user id, never by e-mail, because the repository is public.
+- `src/router.ts` — addresses on the History API, no library: `/` roster, `/new` wizard, `/gm` the GM's menu, `/c/{id}` a sheet on Картка, `/c/{id}/combat|pack|notes` the other tabs. Opening a screen pushes an address; switching tabs and leaving the wizard replace it, so Back goes from a sheet to the roster. The query string is kept, so `?demo` survives navigation.
+- `src/state/campaign.ts` — the store outside React: sign-in, all sheets, the sheets I may change, debounced saves by field, private notes, the catalogue. Components read it with `useCampaign()`.
+- `src/ui/` — screens. `bits.tsx` has the shared controls. `Sheet.tsx` is the frame, `sheet/*Tab.tsx` are its four tabs. Each box of the sheet gets a `SheetApi` (`c`, `d`, `ro`, `gm`, `edit`, `up`). `Gm.tsx` is the GM's menu with the catalogue editor.
 - `src/styles.css` — all styling, as design tokens on `:root` with a dark variant. No UI library.
 - `firestore.rules` — access rules, deployed with the site.
 
 ## Data
 
-- `chars/{id}` = `{ owner, ownerName, by, updatedAt, char }`. Any signed-in user reads, only the owner writes. `char` is a `Character` (`src/rules/types.ts`); `migrate()` brings any stored shape up to date, so add new fields with defaults there instead of writing migrations.
+- `chars/{id}` = `{ owner, ownerName, by, updatedAt, char }`. Any signed-in user reads; the owner writes; the GM may change only the fields in `GM_FIELDS` (health, radiation, conditions, coupons and gear) on another player's sheet. `char` is a `Character` (`src/rules/types.ts`); `migrate()` brings any stored shape up to date, so add new fields with defaults there instead of writing migrations.
 - `users/{uid}/secrets/{charId}` = `{ text, updatedAt }`: private notes, owner only.
-- A sheet is changed with `up(c => { ... })`, an immer recipe; the store saves 0.9 s after the last change.
+- `catalog/main` = `{ guns, items, armors, updatedAt }`: the GM's catalogue. Everyone reads, only the GM writes. Until the GM first saves it, `DEFAULT_CATALOG` (the tables in `data.ts`, ids `g-N`, `m-N`) stands in. Entries the GM hides (`hidden`) are not offered to players. Taking an entry copies it into the sheet, so catalogue edits never reach sheets and sheet edits never reach the catalogue. Prices of 0 keep an entry out of the creation shop.
+- A sheet is changed with `up(c => { ... })`, an immer recipe; the store saves 0.9 s after the last change and writes only the top-level fields that differ from the server's copy (`patchChar`, `char.<field>` in Firestore). News from the server replaces every field except the ones changed here and not saved yet, so a GM edit and a player edit at the same time both survive unless they touch the same field. A new sheet is written whole once (`saveChar`).
+- `up` returns an undo function for that one change; `toast(text, undo)` shows «Скасувати» for 4.5 s. Damage, healing, spending luck, resting, coupons, using, buying, adding and discarding things offer it; small steppers do not.
 
 ## Conventions
 
@@ -62,7 +65,9 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 - The sign-in page is variant Б «Периметр» of the mockups (same canvas, second row) in variant А's colours: hazard tape in the line colour at the top and bottom, the amber trefoil, the name, one olive button, nothing else. Advice about Telegram and other in-app browsers appears only in the error after a failed sign-in.
 - The tab icon is the dark trefoil on an amber square: `public/favicon.svg`, and `public/apple-touch-icon.png` is the same at 180 px without rounded corners for iPhones. Redraw the PNG whenever the SVG changes.
 - Attribute tiles on Картка show the full names in normal case without letter spacing (`.attr .lbl`), because capitals with spacing do not fit five tiles on a phone. «Сприйняття» keeps the GM's name. On 2026-11-14 the owner tried «Уважність» with one-letter tiles, then went back to the full names.
-- Weapons, armour and items each have a «Змінити» button outside «Правити». It opens that thing's fields and «Викинути». A new armour or an own weapon opens its fields at once. «Правити» is for the character's build (attributes, skills, abilities), not for gear.
+- Weapons, armour and items each have a «Змінити» button outside «Редагувати». It opens that thing's fields and «Викинути». A new armour or an own weapon opens its fields at once. «Редагувати» (called «Правити» before 2026-11-14) is for the character's build (attributes, skills, abilities), not for gear.
+- Roster: deleting a character is a «Видалити» button that asks «Точно видалити?», not a ×. The private notes box says «приховано від інших». Радіація, Удача and Хід carry small icons: the trefoil, a clover, boot prints (owner, 2026-11-14).
+- The GM (owner, 2026-11-14): sees every sheet and opens any of them; on another player's sheet health, radiation, conditions, coupons and the whole backpack are editable, the rest is read-only, private notes stay hidden, and only the owner can delete a character. The GM's menu (roster → «Меню майстра», `/gm`) edits the catalogue: change, add, hide, delete entries, or put the standard catalogue back. An artefact catalogue comes later.
 - Health green is muted (`--l0` #709654): the earlier bright green was too harsh on the bar.
 - After sign-in the home page is the roster, not the last sheet (owner, 2026-11-14). A reload or a shared link opens the sheet and tab in the address; a sheet that is not in the base sends the person back to the roster.
 - Done in that pass: luck (pool typed in the wizard, may stay 0; spend 1/3/5; +2 at dawn, +3 in safety, never above the pool; +1 per point and luck rerolls in the shot calculator).
@@ -70,7 +75,6 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 ## Roadmap (agreed with the owner, in this order)
 
 1. Owner's feedback on the redesign, phone and PC, every tab.
-2. GM role, set by a document in Firestore: sees and edits every sheet, private notes included. Saves have to merge by field first, so a GM edit and a player edit at the same moment do not overwrite each other.
-3. Item catalogue filled by the GM (weapons, armour, consumables, ammunition), replacing the tables hard-coded in `data.ts`. Players see only the items the GM has opened and add them to their sheet themselves. Custom items typed on a sheet stay on that sheet and never enter the catalogue.
-4. Artefacts: on hold until the owner has talked to the GM. Do not build artefact effects before that.
-5. Later: simplified NPC sheets for the GM.
+2. Done 2026-11-14: GM role (by user id in `roles.ts` and `firestore.rules`, health and gear only, private notes stay private), saves by field, the GM's item catalogue (weapons, armour, items and ammunition). Next for the GM: an artefact catalogue, once the artefact rules are known.
+3. Artefacts: on hold until the owner has talked to the GM. Do not build artefact effects before that.
+4. Later: simplified NPC sheets for the GM.

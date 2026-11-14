@@ -1,10 +1,20 @@
 import { useState } from "react";
-import { GUNS, GUN_GROUPS, MARKET, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName, modPreset } from "../../rules/data";
-import { addGun, addMarketItem, newArmor, newMod, useCharge, useItem, wear, weightParts } from "../../rules/character";
+import { forViewer, gunGroups, itemGroups } from "../../rules/catalog";
+import { MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName, modPreset } from "../../rules/data";
+import { addArmor, addGun, addMarketItem, newArmor, newMod, useCharge, useItem, wear, weightParts } from "../../rules/character";
 import type { SkillKey } from "../../rules/types";
+import { useCampaign } from "../../state/context";
 import { cx, fmt, kg, num, uid } from "../../util";
 import { Box, Btn, Check, Confirm, Lab, Meter, NumIn, Stepper, Text, toast } from "../bits";
 import type { SheetApi } from "../Sheet";
+
+/** The GM's catalogue as this person may take from it: players see what the GM has not hidden. */
+function useCatalog() {
+  const [st] = useCampaign();
+  return forViewer(st.catalog, st.gm);
+}
+const NOT_IN_CATALOG = "Цього вже немає в каталозі.";
+const hiddenMark = (hidden?: boolean) => (hidden ? " · приховано" : "");
 
 /** Everything the character owns: coupons, the load, weapons, armour, items, artefacts. */
 export function PackTab(api: SheetApi) {
@@ -22,7 +32,8 @@ function MoneyBox({ c, d, ro, up }: SheetApi) {
     const n = Math.round(num(amt, NaN));
     if (!(n > 0)) { toast("Немає суми."); return; }
     if (dir < 0 && n > c.money) { toast("Стільки купонів немає."); return; }
-    up(x => { x.money += n * dir; });
+    const undo = up(x => { x.money += n * dir; });
+    toast(`${dir > 0 ? "+" : "−"}${fmt(n)} куп.`, undo);
     setAmt("");
   };
   const limit = d.cap * 1.5;
@@ -55,14 +66,14 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
   const [open, setOpen] = useState("");
   const [pick, setPick] = useState("");
   const [buy, setBuy] = useState(false);
+  const cat = useCatalog();
   const add = () => {
-    const g = pick === "" ? undefined : GUNS[Number(pick)];
-    if (g && buy && g.p) {
-      if (c.money < g.p) { toast(`Не вистачає купонів: треба ${g.p}.`); return; }
-      toast(`Куплено: ${g.n}, −${g.p} куп.`);
-    }
+    const g = pick === "" ? undefined : cat.guns.find(x => x.id === pick);
+    if (pick !== "" && !g) { toast(NOT_IN_CATALOG); return; }
+    if (g && buy && g.p && c.money < g.p) { toast(`Не вистачає купонів: треба ${g.p}.`); return; }
     const id = uid();
-    up(x => { if (g && buy) x.money -= g.p; addGun(x, g, id); });
+    const undo = up(x => { if (g && buy) x.money -= g.p; addGun(x, g, id); });
+    toast(!g ? "Додано: своя зброя." : buy && g.p ? `Куплено: ${g.n}, −${g.p} куп.` : `Додано: ${g.n}.`, undo);
     if (!g) setOpen(id); // an own weapon starts blank, so its fields open at once
     setAdding(false);
   };
@@ -89,7 +100,7 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
               </div>
               {(edit || isOpen) && <WeaponEdit {...{ c, up, i }} />}
               {isOpen && <ModsEditor {...{ c, up, i }} />}
-              {(edit || isOpen) && <div><Confirm sm={false} label="Викинути зброю" ask="Точно викинути?" title="Викинути зброю" onConfirm={() => up(x => { x.weapons.splice(i, 1); })} /></div>}
+              {(edit || isOpen) && <div><Confirm sm={false} label="Викинути зброю" ask="Точно викинути?" title="Викинути зброю" onConfirm={() => toast(`Викинуто: ${g.name}.`, up(x => { x.weapons.splice(i, 1); }))} /></div>}
             </div>
           );
         })}
@@ -98,7 +109,10 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
             <div className="row wrapg">
               <select className="in" aria-label="Яку зброю додати" value={pick} onChange={e => setPick(e.target.value)}>
                 <option value="">Своя зброя</option>
-                {GUN_GROUPS.map(grp => <optgroup key={grp} label={grp}>{GUNS.map((g, i) => g.g === grp ? <option key={g.n} value={i}>{g.n}{g.p ? `, ${g.p} куп.` : ""}</option> : null)}</optgroup>)}
+                {gunGroups(cat.guns).map(grp => {
+                  const xs = cat.guns.filter(g => g.g === grp);
+                  return xs.length ? <optgroup key={grp} label={grp}>{xs.map(g => <option key={g.id} value={g.id}>{g.n}{g.p ? `, ${g.p} куп.` : ""}{hiddenMark(g.hidden)}</option>)}</optgroup> : null;
+                })}
               </select>
               <Btn pri onClick={add}>Додати</Btn>
               <Btn onClick={() => setAdding(false)}>Скасувати</Btn>
@@ -111,7 +125,7 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
   );
 }
 
-/** A weapon's own numbers, under its «Змінити» button or in «Правити». */
+/** A weapon's own numbers, under its «Змінити» button or in «Редагувати». */
 function WeaponEdit({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
   const g = c.weapons[i];
   return (
@@ -157,14 +171,29 @@ function ModsEditor({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
 /** Every armour owned. Only one can be worn; its numbers protect in «Бій». */
 function ArmorsBox({ c, ro, edit, up }: SheetApi) {
   const [open, setOpen] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [pick, setPick] = useState("");
+  const [buy, setBuy] = useState(false);
+  const cat = useCatalog();
   const field = (i: number, name: string, key: "kin" | "acid" | "fire" | "elec" | "rad" | "w" | "slots") =>
     <Lab name={name}><NumIn value={num(c.armors[i][key])} set={v => up(x => { x.armors[i][key] = v; })} /></Lab>;
-  // a new armour starts blank, so its fields open at once
-  const add = () => { const a = newArmor(); up(x => { x.armors.push({ ...a }); }); setOpen(a.id); };
+  // an own armour starts blank, so its fields open at once
+  const addOwn = () => { const a = newArmor(); toast("Додано: своя броня.", up(x => { x.armors.push({ ...a }); })); setOpen(a.id); setAdding(false); };
+  const add = () => {
+    if (pick === "") { addOwn(); return; }
+    const a = cat.armors.find(x => x.id === pick);
+    if (!a) { toast(NOT_IN_CATALOG); return; }
+    if (buy && a.p && c.money < a.p) { toast(`Не вистачає купонів: треба ${a.p}.`); return; }
+    const undo = up(x => { if (buy) x.money -= a.p; addArmor(x, a); });
+    toast(buy && a.p ? `Куплено: ${a.n}, −${a.p} куп.` : `Додано: ${a.n}.`, undo);
+    setAdding(false);
+  };
+  // with no armour in the catalogue there is nothing to choose from: «+ Додати» makes a blank one at once
+  const plus = () => (cat.armors.length ? setAdding(true) : addOwn());
   return (
-    <Box title="Броня" ro={ro} right={!ro ? <Btn sm onClick={add}>+ Додати</Btn> : undefined}>
+    <Box title="Броня" ro={ro} right={!ro && !adding ? <Btn sm onClick={plus}>+ Додати</Btn> : undefined}>
       <div>
-        {c.armors.length === 0 && <p className="empty">Броні немає.</p>}
+        {c.armors.length === 0 && !adding && <p className="empty">Броні немає.</p>}
         {c.armors.map((a, i) => {
           const isOpen = open === a.id;
           return (
@@ -186,11 +215,24 @@ function ArmorsBox({ c, ro, edit, up }: SheetApi) {
                 {field(i, "Кінетика", "kin")}{field(i, "Кислота", "acid")}{field(i, "Вогонь", "fire")}{field(i, "Електрика", "elec")}{field(i, "Радіація", "rad")}{field(i, "Вага, кг", "w")}{field(i, "Контейнери", "slots")}
                 <Check wide checked={a.countW} set={v => up(x => { x.armors[i].countW = v; })}>Рахувати вагу у вантаж</Check>
               </div>
-              <div><Confirm sm={false} label="Викинути броню" ask="Точно викинути?" title="Викинути броню" onConfirm={() => up(x => { x.armors.splice(i, 1); })} /></div>
+              <div><Confirm sm={false} label="Викинути броню" ask="Точно викинути?" title="Викинути броню" onConfirm={() => toast(`Викинуто: ${a.name}.`, up(x => { x.armors.splice(i, 1); }))} /></div>
             </>}
           </div>
           );
         })}
+        {adding && (
+          <div className="addf">
+            <div className="row wrapg">
+              <select className="in" aria-label="Яку броню додати" value={pick} onChange={e => setPick(e.target.value)}>
+                <option value="">Своя броня</option>
+                {cat.armors.map(a => <option key={a.id} value={a.id}>{a.n}{a.p ? `, ${a.p} куп.` : ""}{hiddenMark(a.hidden)}</option>)}
+              </select>
+              <Btn pri onClick={add}>Додати</Btn>
+              <Btn onClick={() => setAdding(false)}>Скасувати</Btn>
+            </div>
+            <Check checked={buy} set={setBuy}>Купити: списати купони</Check>
+          </div>
+        )}
       </div>
     </Box>
   );
@@ -199,22 +241,25 @@ function ArmorsBox({ c, ro, edit, up }: SheetApi) {
 function ItemsBox({ c, ro, edit, up }: SheetApi) {
   const [adding, setAdding] = useState(false);
   const [open, setOpen] = useState("");
-  const [pick, setPick] = useState("0");
+  const [pick, setPick] = useState("");
   const [buy, setBuy] = useState(false);
   const [name, setName] = useState("");
   const [qty, setQty] = useState("");
   const [weight, setWeight] = useState("");
+  const cat = useCatalog();
+  const picked = cat.items.find(x => x.id === pick) ?? cat.items[0];
   const addFromMarket = () => {
-    const m = MARKET[Number(pick)];
-    if (!m) return;
+    const m = picked;
+    if (!m) { toast(NOT_IN_CATALOG); return; }
     if (buy && c.money < m.p) { toast(`Не вистачає купонів: треба ${m.p}.`); return; }
-    up(x => { if (buy) x.money -= m.p; addMarketItem(x, m); });
-    toast(buy ? `Куплено: ${marketName(m)}, −${m.p} куп.` : `Додано: ${marketName(m)}.`);
+    const undo = up(x => { if (buy) x.money -= m.p; addMarketItem(x, m); });
+    toast(buy ? `Куплено: ${marketName(m)}, −${m.p} куп.` : `Додано: ${marketName(m)}.`, undo);
   };
   const addOwn = () => {
     const n = name.trim();
     if (!n) { toast("Немає назви."); return; }
-    up(x => { x.items.push({ id: uid(), name: n, qty: Math.max(1, Math.round(num(qty, 1))), w: Math.max(0, num(weight, 0)), note: "" }); });
+    const undo = up(x => { x.items.push({ id: uid(), name: n, qty: Math.max(1, Math.round(num(qty, 1))), w: Math.max(0, num(weight, 0)), note: "" }); });
+    toast(`Додано: ${n}.`, undo);
     setName(""); setQty(""); setWeight("");
   };
   return (
@@ -229,8 +274,8 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
                 <b>{it.name}</b>
                 {it.uses != null && <span className="hint">у початому: {q > 0 ? num(it.uses) : 0}</span>}
               </div>
-              {it.fx && <Btn sm pri disabled={q <= 0} onClick={() => { let msg = ""; up(x => { msg = useItem(x, it.id); }); if (msg) toast(msg); }}>Вжити</Btn>}
-              {it.uses != null && !it.fx && <Btn sm disabled={q <= 0} onClick={() => up(x => useCharge(x.items[i]))}>Використати</Btn>}
+              {it.fx && <Btn sm pri disabled={q <= 0} onClick={() => { let msg = ""; const undo = up(x => { msg = useItem(x, it.id); }); if (msg) toast(msg, undo); }}>Вжити</Btn>}
+              {it.uses != null && !it.fx && <Btn sm disabled={q <= 0} onClick={() => toast(`${it.name}: одне використання.`, up(x => useCharge(x.items[i])))}>Використати</Btn>}
               <Stepper value={q} min={0} max={9999} set={v => up(x => { x.items[i].qty = v; })} />
               <span className="iw num">{kg(q * num(it.w))} кг</span>
               {!ro && !edit && <Btn sm pri={isOpen} onClick={() => setOpen(isOpen ? "" : it.id)}>{isOpen ? "Готово" : "Змінити"}</Btn>}
@@ -239,21 +284,27 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
                   <Lab name="Назва"><Text value={it.name} set={v => up(x => { x.items[i].name = v; })} /></Lab>
                   <Lab name="Вага однієї, кг"><NumIn value={num(it.w)} set={v => up(x => { x.items[i].w = v; })} /></Lab>
                   <Lab name="Нотатка" wide><Text value={it.note} set={v => up(x => { x.items[i].note = v; })} /></Lab>
-                  <div className="wide"><Confirm sm={false} label="Викинути" ask="Точно викинути?" title="Викинути річ" onConfirm={() => up(x => { x.items.splice(i, 1); })} /></div>
+                  <div className="wide"><Confirm sm={false} label="Викинути" ask="Точно викинути?" title="Викинути річ" onConfirm={() => toast(`Викинуто: ${it.name}.`, up(x => { x.items.splice(i, 1); }))} /></div>
                 </div>
               )}
             </div>
           );
         })}
         {adding && <>
-          <div className="addf">
-            <div className="lbl">З ринку майстра</div>
+          {cat.items.length > 0 && <div className="addf">
+            <div className="lbl">З каталогу майстра</div>
             <div className="row wrapg">
-              <select className="in" aria-label="Що додати" value={pick} onChange={e => setPick(e.target.value)}>{MARKET.map((m, i) => <option key={i} value={i}>{marketName(m)}{m.p ? `, ${m.p} куп.` : ""}</option>)}</select>
+              <select className="in" aria-label="Що додати" value={picked?.id ?? ""} onChange={e => setPick(e.target.value)}>
+                {itemGroups(cat.items).map(grp => (
+                  <optgroup key={grp} label={grp}>
+                    {cat.items.filter(m => m.g === grp).map(m => <option key={m.id} value={m.id}>{marketName(m)}{m.p ? `, ${m.p} куп.` : ""}{hiddenMark(m.hidden)}</option>)}
+                  </optgroup>
+                ))}
+              </select>
               <Btn pri onClick={addFromMarket}>Додати</Btn>
             </div>
             <Check checked={buy} set={setBuy}>Купити: списати купони</Check>
-          </div>
+          </div>}
           <div className="addf">
             <div className="lbl">Своя річ</div>
             <div className="row wrapg">
@@ -290,7 +341,7 @@ function ArtifactsBox({ c, ro, edit, up }: SheetApi) {
         {c.artifacts.map((a, i) => (
           <div className="irow" key={a.id}>
             <div className="nm"><b>{a.name}</b>{a.fx && <span className="hint">{a.fx}</span>}</div>
-            <Confirm onConfirm={() => up(x => { x.artifacts.splice(i, 1); })} />
+            <Confirm onConfirm={() => toast(`Викинуто: ${a.name}.`, up(x => { x.artifacts.splice(i, 1); }))} />
           </div>
         ))}
         {adding && (

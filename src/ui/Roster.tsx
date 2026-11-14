@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { maxHp, migrate } from "../rules/character";
 import { decode, encode } from "../rules/codes";
+import { navigate } from "../router";
 import { useCampaign } from "../state/context";
 import { Area, Box, Btn, Check, Confirm, toast } from "./bits";
 
@@ -66,10 +67,10 @@ export function Roster({ open, hasDraft, startWizard }: { open: (id: string) => 
     return (
       <div className="crow" key={x.e.id}>
         <div className="nm"><h3>{c.id.callsign || "Без позивного"}</h3><span className="hint">{meta}</span></div>
-        <Btn pri={x.own} onClick={() => open(x.e.id)}>{x.own ? "Відкрити" : "Переглянути"}</Btn>
+        <Btn pri={x.own} onClick={() => open(x.e.id)}>{x.own || st.gm ? "Відкрити" : "Переглянути"}</Btn>
         {x.own && <>
           <Btn title="Код-копія персонажа" onClick={() => makeCode(x.e.id, false)}>Код</Btn>
-          <Confirm sm={false} title="Видалити персонажа" onConfirm={() => { if (exp?.id === x.e.id) setExp(null); camp.remove(x.e.id); }} />
+          <Confirm sm={false} label="Видалити" ask="Точно видалити?" title="Видалити персонажа" onConfirm={() => { if (exp?.id === x.e.id) setExp(null); camp.remove(x.e.id); }} />
         </>}
       </div>
     );
@@ -81,7 +82,13 @@ export function Roster({ open, hasDraft, startWizard }: { open: (id: string) => 
     <div>
       <header className="top">
         <div className="who"><h1>S.T.A.L.K.E.R. TTRPG</h1></div>
-        <div className="top-r"><span className="sync">{st.user?.name}</span><Btn sm onClick={() => camp.signOut()}>Вийти</Btn></div>
+        <div className="top-r">
+          <span className="sync">{st.user?.name}{st.gm ? " · майстер" : ""}</span>
+          <div className="row wrapg" style={{ justifyContent: "flex-end" }}>
+            {st.gm && <Btn sm pri onClick={() => navigate({ name: "gm" })}>Меню майстра</Btn>}
+            <Btn sm onClick={() => camp.signOut()}>Вийти</Btn>
+          </div>
+        </div>
       </header>
       {st.error && <div className="warnbar" style={{ marginTop: 12 }}>{st.error}</div>}
       <div className="rgrid">
