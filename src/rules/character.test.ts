@@ -4,7 +4,7 @@ import { SHOT0, addGun, addMarketItem, quickDraw, blankCharacter, cartTotals, da
 import { decode, encode } from "./codes";
 import type { Character } from "./types";
 
-/** The sniper this sheet was first built for: Спритність 5, Тілобудова 3, Уважність 4, Реакція 3, Мудрість 1. */
+/** The sniper this sheet was first built for: Спритність 5, Тілобудова 3, Сприйняття 4, Реакція 3, Мудрість 1. */
 function simka(): Character {
   const c = blankCharacter();
   Object.assign(c.attrs, { spr: 5, til: 3, spy: 4, rea: 3, mud: 1 });

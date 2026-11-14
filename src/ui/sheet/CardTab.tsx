@@ -84,7 +84,7 @@ function AttrsBox({ c, d, ro, edit, up }: SheetApi) {
           return (
             <div className="attr" key={a.key} title={[a.name, reasons(d, a.key)].filter(Boolean).join(": ")}>
               <span className={cx("v", v < base && "neg", v > base && "pos")}>{v}</span>
-              <span className="lbl">{a.abbr}</span>
+              <span className="lbl">{a.name}</span>
               <span className="was" style={{ visibility: v !== base ? "visible" : "hidden" }}>з {base}</span>
             </div>
           );

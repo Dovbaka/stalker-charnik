@@ -340,8 +340,8 @@ export function addMarketItem(c: Character, m: MarketEntry): void {
   c.items.push(o);
 }
 export const newMod = (p: ModPreset) => ({ id: uid(), name: p.name, kind: p.kind, bonus: p.bonus });
-export function addGun(c: Character, g: GunEntry = CUSTOM_GUN): void {
-  c.weapons.push({ id: uid(), name: g.n, skill: g.skill, dmg: g.dmg, mag: g.mag, cur: g.mag, modes: g.modes, range: g.range, w: g.w, cal: g.cal, nato: !!g.nato, jams: 0, note: g.note, on: true, mods: (g.mods ?? []).map(k => newMod(modPreset(k))) });
+export function addGun(c: Character, g: GunEntry = CUSTOM_GUN, id = uid()): void {
+  c.weapons.push({ id, name: g.n, skill: g.skill, dmg: g.dmg, mag: g.mag, cur: g.mag, modes: g.modes, range: g.range, w: g.w, cal: g.cal, nato: !!g.nato, jams: 0, note: g.note, on: true, mods: (g.mods ?? []).map(k => newMod(modPreset(k))) });
 }
 /** Spends one use of a kit; an emptied kit takes one off the count and opens the next. */
 export function useCharge(it: Item): void {
@@ -353,7 +353,7 @@ export function useItem(c: Character, id: string): string {
   const it = c.items.find(x => x.id === id);
   if (!it || num(it.qty) <= 0) return "";
   if (it.fx === "antirad") { it.qty--; c.rad = Math.max(0, c.rad - 250); return "Антирад: −250 рад."; }
-  if (it.fx === "vodka") { it.qty--; c.rad = Math.max(0, c.rad - 100); c.vodka = Math.min(9, c.vodka + 1); return "Горілка: −100 рад, −1 до Мудрості, Реакції, Уважності і Спритності."; }
+  if (it.fx === "vodka") { it.qty--; c.rad = Math.max(0, c.rad - 100); c.vodka = Math.min(9, c.vodka + 1); return "Горілка: −100 рад, −1 до Мудрості, Реакції, Сприйняття і Спритності."; }
   if (it.fx === "sci") { c.rad = Math.max(0, c.rad - 250); useCharge(it); return "Наукова аптечка: −250 рад, одне використання."; }
   return "";
 }

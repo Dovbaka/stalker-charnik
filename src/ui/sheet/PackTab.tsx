@@ -52,7 +52,7 @@ function MoneyBox({ c, d, ro, up }: SheetApi) {
 /** Every weapon owned. "На собі" marks the ones carried ready; those appear in «Бій». */
 function WeaponsBox({ c, ro, edit, up }: SheetApi) {
   const [adding, setAdding] = useState(false);
-  const [modsOf, setModsOf] = useState("");
+  const [open, setOpen] = useState("");
   const [pick, setPick] = useState("");
   const [buy, setBuy] = useState(false);
   const add = () => {
@@ -61,7 +61,9 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
       if (c.money < g.p) { toast(`Не вистачає купонів: треба ${g.p}.`); return; }
       toast(`Куплено: ${g.n}, −${g.p} куп.`);
     }
-    up(x => { if (g && buy) x.money -= g.p; addGun(x, g); });
+    const id = uid();
+    up(x => { if (g && buy) x.money -= g.p; addGun(x, g, id); });
+    if (!g) setOpen(id); // an own weapon starts blank, so its fields open at once
     setAdding(false);
   };
   return (
@@ -70,6 +72,7 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
         {c.weapons.length === 0 && !adding && <p className="empty">Зброї немає.</p>}
         {c.weapons.map((g, i) => {
           const meta = [g.range, g.dmg, g.cal, g.mag ? `магазин ${g.mag}` : "", g.nato ? "НАТО" : ""].filter(Boolean).join(" · ");
+          const isOpen = open === g.id;
           return (
             <div className="card" key={g.id}>
               <div className="row between" style={{ alignItems: "flex-start" }}>
@@ -79,13 +82,14 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
                 </div>
                 <span className="iw num">{kg(num(g.w))} кг</span>
               </div>
-              {g.mods.length > 0 && modsOf !== g.id && <div className="chips">{g.mods.map(md => <span key={md.id} className="chip">{md.name}</span>)}</div>}
+              {g.mods.length > 0 && !isOpen && <div className="chips">{g.mods.map(md => <span key={md.id} className="chip">{md.name}</span>)}</div>}
               <div className="row between">
                 <Check checked={g.on} set={v => up(x => { x.weapons[i].on = v; })}>На собі</Check>
-                {!ro && <Btn sm pri={modsOf === g.id} onClick={() => setModsOf(modsOf === g.id ? "" : g.id)}>{modsOf === g.id ? "Готово" : "Модифікації"}</Btn>}
+                {!ro && <Btn sm pri={isOpen} onClick={() => setOpen(isOpen ? "" : g.id)}>{isOpen ? "Готово" : "Змінити"}</Btn>}
               </div>
-              {modsOf === g.id && <ModsEditor {...{ c, up, i }} />}
-              {edit && <WeaponEdit {...{ c, up, i }} />}
+              {(edit || isOpen) && <WeaponEdit {...{ c, up, i }} />}
+              {isOpen && <ModsEditor {...{ c, up, i }} />}
+              {(edit || isOpen) && <div><Confirm sm={false} label="Викинути зброю" ask="Точно викинути?" title="Викинути зброю" onConfirm={() => up(x => { x.weapons.splice(i, 1); })} /></div>}
             </div>
           );
         })}
@@ -107,10 +111,10 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
   );
 }
 
-/** A weapon's own numbers, in «Правити». */
+/** A weapon's own numbers, under its «Змінити» button or in «Правити». */
 function WeaponEdit({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
   const g = c.weapons[i];
-  return <>
+  return (
     <div className="fgrid">
       <Lab name="Назва" wide><Text value={g.name} set={v => up(x => { x.weapons[i].name = v; })} /></Lab>
       <Lab name="Навичка"><select className="in" value={g.skill} onChange={e => up(x => { x.weapons[i].skill = e.target.value as SkillKey; })}>{WEAPON_SKILLS.map(k => <option key={k} value={k}>{SKILL_NAME[k]}</option>)}</select></Lab>
@@ -122,8 +126,7 @@ function WeaponEdit({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
       <Lab name="Нотатка" wide><Text value={g.note} set={v => up(x => { x.weapons[i].note = v; })} /></Lab>
       <Check wide checked={g.nato} set={v => up(x => { x.weapons[i].nato = v; })}>Зброя НАТО, +1 до влучання</Check>
     </div>
-    <div><Confirm sm={false} label="Викинути зброю" ask="Точно викинути?" title="Викинути зброю" onConfirm={() => up(x => { x.weapons.splice(i, 1); })} /></div>
-  </>;
+  );
 }
 
 /** Attachments of one weapon: add from the list or your own, set the GM's bonus, take off. */
@@ -153,13 +156,18 @@ function ModsEditor({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
 
 /** Every armour owned. Only one can be worn; its numbers protect in «Бій». */
 function ArmorsBox({ c, ro, edit, up }: SheetApi) {
+  const [open, setOpen] = useState("");
   const field = (i: number, name: string, key: "kin" | "acid" | "fire" | "elec" | "rad" | "w" | "slots") =>
     <Lab name={name}><NumIn value={num(c.armors[i][key])} set={v => up(x => { x.armors[i][key] = v; })} /></Lab>;
+  // a new armour starts blank, so its fields open at once
+  const add = () => { const a = newArmor(); up(x => { x.armors.push({ ...a }); }); setOpen(a.id); };
   return (
-    <Box title="Броня" ro={ro} right={!ro ? <Btn sm onClick={() => up(x => { x.armors.push(newArmor()); })}>+ Додати</Btn> : undefined}>
+    <Box title="Броня" ro={ro} right={!ro ? <Btn sm onClick={add}>+ Додати</Btn> : undefined}>
       <div>
         {c.armors.length === 0 && <p className="empty">Броні немає.</p>}
-        {c.armors.map((a, i) => (
+        {c.armors.map((a, i) => {
+          const isOpen = open === a.id;
+          return (
           <div className="card" key={a.id}>
             <div className="row between" style={{ alignItems: "flex-start" }}>
               <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
@@ -168,8 +176,11 @@ function ArmorsBox({ c, ro, edit, up }: SheetApi) {
               </div>
               <span className="iw num">{a.countW ? kg(num(a.w)) + " кг" : "—"}</span>
             </div>
-            <Check checked={a.on} set={() => up(x => wear(x, a.id))}>Надіта</Check>
-            {edit && <>
+            <div className="row between">
+              <Check checked={a.on} set={() => up(x => wear(x, a.id))}>Надіта</Check>
+              {!ro && !edit && <Btn sm pri={isOpen} onClick={() => setOpen(isOpen ? "" : a.id)}>{isOpen ? "Готово" : "Змінити"}</Btn>}
+            </div>
+            {(edit || isOpen) && <>
               <div className="fgrid">
                 <Lab name="Назва" wide><Text value={a.name} set={v => up(x => { x.armors[i].name = v; })} /></Lab>
                 {field(i, "Кінетика", "kin")}{field(i, "Кислота", "acid")}{field(i, "Вогонь", "fire")}{field(i, "Електрика", "elec")}{field(i, "Радіація", "rad")}{field(i, "Вага, кг", "w")}{field(i, "Контейнери", "slots")}
@@ -178,7 +189,8 @@ function ArmorsBox({ c, ro, edit, up }: SheetApi) {
               <div><Confirm sm={false} label="Викинути броню" ask="Точно викинути?" title="Викинути броню" onConfirm={() => up(x => { x.armors.splice(i, 1); })} /></div>
             </>}
           </div>
-        ))}
+          );
+        })}
       </div>
     </Box>
   );
@@ -186,6 +198,7 @@ function ArmorsBox({ c, ro, edit, up }: SheetApi) {
 
 function ItemsBox({ c, ro, edit, up }: SheetApi) {
   const [adding, setAdding] = useState(false);
+  const [open, setOpen] = useState("");
   const [pick, setPick] = useState("0");
   const [buy, setBuy] = useState(false);
   const [name, setName] = useState("");
@@ -209,7 +222,7 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
       <div>
         {c.items.length === 0 && !adding && <p className="empty">Речей немає.</p>}
         {c.items.map((it, i) => {
-          const q = num(it.qty);
+          const q = num(it.qty), isOpen = open === it.id;
           return (
             <div className={cx("irow", !q && "zero")} key={it.id}>
               <div className="nm">
@@ -220,7 +233,8 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
               {it.uses != null && !it.fx && <Btn sm disabled={q <= 0} onClick={() => up(x => useCharge(x.items[i]))}>Використати</Btn>}
               <Stepper value={q} min={0} max={9999} set={v => up(x => { x.items[i].qty = v; })} />
               <span className="iw num">{kg(q * num(it.w))} кг</span>
-              {edit && (
+              {!ro && !edit && <Btn sm pri={isOpen} onClick={() => setOpen(isOpen ? "" : it.id)}>{isOpen ? "Готово" : "Змінити"}</Btn>}
+              {(edit || isOpen) && (
                 <div className="fgrid" style={{ flex: "1 1 100%" }}>
                   <Lab name="Назва"><Text value={it.name} set={v => up(x => { x.items[i].name = v; })} /></Lab>
                   <Lab name="Вага однієї, кг"><NumIn value={num(it.w)} set={v => up(x => { x.items[i].w = v; })} /></Lab>

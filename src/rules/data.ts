@@ -5,14 +5,13 @@ export const ATTR_PTS = 16;
 export const SKILL_PTS = 18;
 export const START_MONEY = 4000;
 
-export const ATTRS: { key: AttrKey; name: string; abbr: string; long: string }[] = [
-  { key: "spr", name: "Спритність", abbr: "С", long: "Швидкість і мобільність: скільки метрів за хід, скритність, ухилення, швидко дістати зброю." },
-  { key: "til", name: "Тілобудова", abbr: "Т", long: "Витривалість і сила: здоров'я (×5 + 10), удар у ближньому бою, вантаж (×10 кг)." },
-  { key: "spy", name: "Уважність", abbr: "У", long: "Чуття й інстинкти: помітити ворога, слід чи засідку." },
-  { key: "rea", name: "Реакція", abbr: "Р", long: "Рефлекси: хто ходить першим у бою." },
-  { key: "mud", name: "Мудрість", abbr: "М", long: "Інтелект і кмітливість: знання, медицина, складні задачі." },
+export const ATTRS: { key: AttrKey; name: string; long: string }[] = [
+  { key: "spr", name: "Спритність", long: "Швидкість і мобільність: скільки метрів за хід, скритність, ухилення, швидко дістати зброю." },
+  { key: "til", name: "Тілобудова", long: "Витривалість і сила: здоров'я (×5 + 10), удар у ближньому бою, вантаж (×10 кг)." },
+  { key: "spy", name: "Сприйняття", long: "Уважність та інстинкти: помітити ворога, слід чи засідку." },
+  { key: "rea", name: "Реакція", long: "Рефлекси: хто ходить першим у бою." },
+  { key: "mud", name: "Мудрість", long: "Інтелект і кмітливість: знання, медицина, складні задачі." },
 ];
-export const ATTR_ABBR = Object.fromEntries(ATTRS.map(a => [a.key, a.abbr])) as Record<AttrKey, string>;
 export const ATTR_KEYS: AttrKey[] = ATTRS.map(a => a.key);
 
 export const SKILL_GROUPS: { name: string; skills: { key: SkillKey; name: string; attr?: AttrKey }[] }[] = [

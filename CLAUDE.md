@@ -60,7 +60,8 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 - The site is called «S.T.A.L.K.E.R. TTRPG» (tab title, sign-in page, roster header), not «Чарнік сталкера» (owner, 2026-11-14).
 - The sign-in page is variant Б «Периметр» of the mockups (same canvas, second row) in variant А's colours: hazard tape in the line colour at the top and bottom, the amber trefoil, the name, one olive button, nothing else. Advice about Telegram and other in-app browsers appears only in the error after a failed sign-in.
 - The tab icon is the dark trefoil on an amber square: `public/favicon.svg`, and `public/apple-touch-icon.png` is the same at 180 px without rounded corners for iPhones. Redraw the PNG whenever the SVG changes.
-- The attribute the GM's document calls «Сприйняття» is «Уважність» in the app (owner, 2026-11-14; the stored key stays `spy`). With that, every attribute starts with its own letter, and the tiles on Картка read С, Т, У, Р, М, because full names do not fit. Full names stay in the wizard, in edit mode and in the tile tooltips.
+- Attribute tiles on Картка show the full names in normal case without letter spacing (`.attr .lbl`), because capitals with spacing do not fit five tiles on a phone. «Сприйняття» keeps the GM's name. On 2026-11-14 the owner tried «Уважність» with one-letter tiles, then went back to the full names.
+- Weapons, armour and items each have a «Змінити» button outside «Правити». It opens that thing's fields and «Викинути». A new armour or an own weapon opens its fields at once. «Правити» is for the character's build (attributes, skills, abilities), not for gear.
 - Health green is muted (`--l0` #709654): the earlier bright green was too harsh on the bar.
 - Done in that pass: luck (pool typed in the wizard, may stay 0; spend 1/3/5; +2 at dawn, +3 in safety, never above the pool; +1 per point and luck rerolls in the shot calculator).
 
