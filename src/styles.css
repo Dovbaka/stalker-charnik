@@ -110,6 +110,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn .cost { margin-left: 6px; font-size: 11px; opacity: .75; }
 .step { display: inline-flex; align-items: stretch; flex: none; }
 .step .btn { border-radius: 0; width: 36px; min-width: 36px; min-height: 36px; padding: 0; font-size: 16px; }
+/* the buttons are the counter frame: a disabled one dims only its sign, so both edges of the number stay alike */
+.step .btn:disabled { opacity: 1; color: var(--line); }
 .step output { min-width: 2.6em; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border-block: 1px solid var(--ink); font: 15px/1 var(--font-m); font-variant-numeric: tabular-nums; }
 .in { width: 100%; min-width: 0; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 7px 10px; min-height: 40px; border-radius: 2px; font: 16px/1.3 var(--font-b); }
 .in.w4 { width: 4.6em; flex: none; }

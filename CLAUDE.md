@@ -71,6 +71,7 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 - The GM (owner, 2026-11-14): sees every sheet and opens any of them; on another player's sheet health, radiation, conditions, coupons and the whole backpack are editable, the rest is read-only, private notes stay hidden, and only the owner can delete a character. The GM's menu (roster → «Меню майстра», `/gm`) edits the catalogue: change, add, hide, delete entries, or put the standard catalogue back. An artefact catalogue comes later.
 - Health green is muted (`--l0` #709654): the earlier bright green was too harsh on the bar.
 - After sign-in the home page is the roster, not the last sheet (owner, 2026-11-14). A reload or a shared link opens the sheet and tab in the address; a sheet that is not in the base sends the person back to the roster.
+- A counter (`Stepper`) keeps its frame even: its buttons are the frame of the number, so a disabled − or + dims only its sign, not its border.
 - Done in that pass: luck (pool typed in the wizard, may stay 0; spend 1/3/5; +2 at dawn, +3 in safety, never above the pool; +1 per point and luck rerolls in the shot calculator).
 
 ## Roadmap (agreed with the owner, in this order)
