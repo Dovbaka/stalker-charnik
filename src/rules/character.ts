@@ -19,6 +19,7 @@ export function blankCharacter(): Character {
     armor: { name: "Шкіряна куртка", kin: 2, acid: 2, fire: 2, elec: 2, rad: 0, w: 3, countW: false, slots: 1, mask: false },
     weapons: [], items: [], artifacts: [], abilities: [],
     reroll: { skill: "", bonus: 2 },
+    luck: { pool: 0, cur: 0 },
     notes: "", createdAt: 0, updatedAt: 0,
   };
 }
@@ -88,7 +89,12 @@ export interface Derived {
   wounds: number;
   state: "ok" | "out" | "dead";
   label: string;
-  hpCls: "ok" | "warn" | "bad";
+  /** colour step of the health bar: the number of wounds, 4 when unconscious or dead */
+  level: 0 | 1 | 2 | 3 | 4;
+  /** health values at which the first, second and third wound begin */
+  marks: [number, number, number];
+  /** health at which the character dies */
+  deathAt: number;
   /** penalty to every check from untreated wounds */
   checkPen: number;
   /** attributes after every modifier */
@@ -128,7 +134,7 @@ export function derive(c: Character): Derived {
   if (wEff === 3) for (const k of ATTR_KEYS) halves[k].push("рани");
   const r = c.rad, radStage = r >= 1000 ? 5 : r >= 800 ? 4 : r >= 500 ? 3 : r >= 300 ? 2 : r >= 100 ? 1 : 0;
   add("til", -RAD_PEN[radStage][0], "радіація"); add("spr", -RAD_PEN[radStage][1], "радіація"); add("rea", -RAD_PEN[radStage][2], "радіація");
-  if (c.vodka > 0) for (const k of VODKA_ATTRS) add(k, -c.vodka, "горілка");
+  if (c.vodka > 0) for (const k of VODKA_ATTRS) add(k, -c.vodka, "алкоголь");
   if (c.noSleep === 1) for (const k of ATTR_KEYS) { if (k !== "til") add(k, -1, "без сну"); }
   if (c.noSleep >= 2) for (const k of ATTR_KEYS) add(k, k === "til" ? -1 : -2, "без сну");
   add("til", -c.noFood, "голод"); add("til", -c.noWater, "спрага");
@@ -151,9 +157,11 @@ export function derive(c: Character): Derived {
   if (state === "ok" && (vodkaOut || c.noSleep >= 3)) state = "out";
 
   const label = state === "dead" ? "Смерть" : state === "out" ? "Без свідомості" : wounds === 0 ? "У строю" : wounds === 1 ? "Поранення" : "Поранення ×" + wounds;
-  const hpCls: Derived["hpCls"] = state !== "ok" || wounds >= 2 ? "bad" : wounds === 1 ? "warn" : "ok";
+  const level = (state !== "ok" ? 4 : wounds) as Derived["level"];
+  // a wound starts once a quarter of health is lost: with 25 health that is at 18, 12 and 6
+  const marks = [1, 2, 3].map(k => Math.floor(max * (1 - 0.25 * k))) as [number, number, number];
   const woundText = wounds && c.woundsTreated ? WOUND_TEXT[wounds] + " Зараз знято лікуванням." : WOUND_TEXT[wounds];
-  return { max, wounds, state, label, hpCls, checkPen, eff, lines, halves, radStage, weight, cap, over, woundText, vodkaOut, nextVodkaOut };
+  return { max, wounds, state, label, level, marks, deathAt: -Math.ceil(max / 4), checkPen, eff, lines, halves, radStage, weight, cap, over, woundText, vodkaOut, nextVodkaOut };
 }
 
 /* ---------- shooting ---------- */
@@ -165,8 +173,10 @@ export interface ShotOpts {
   cover: "0" | "1" | "3";
   tprone: boolean; vis: boolean; invis: boolean; lying: boolean;
   rounds: number; nato: boolean; jam: number; extra: number;
+  /** luck points spent for +1 each */
+  luck: number;
 }
-export const SHOT0: ShotOpts = { skill: "rifles", shot: "aimed", sit: false, optic: false, colim: false, near: "far", cover: "0", tprone: false, vis: false, invis: false, lying: false, rounds: 0, nato: false, jam: 0, extra: 0 };
+export const SHOT0: ShotOpts = { skill: "rifles", shot: "aimed", sit: false, optic: false, colim: false, near: "far", cover: "0", tprone: false, vis: false, invis: false, lying: false, rounds: 0, nato: false, jam: 0, extra: 0, luck: 0 };
 
 export interface ShotCalc {
   parts: [string, number][];
@@ -200,6 +210,7 @@ export function shotCalc(c: Character, d: Derived, o: ShotOpts): ShotCalc {
   if (o.nato) P("зброя НАТО", 1);
   if (o.jam) P("заклинювання", -o.jam);
   if (o.extra) P("інше", o.extra);
+  if (o.luck) P("удача", o.luck);
   if (d.checkPen) P("рани", d.checkPen);
   const mod = parts.reduce((s, x) => s + x[1], 0);
   const rb = num(c.reroll?.bonus), rs = c.reroll?.skill ?? "";
@@ -257,6 +268,32 @@ export function reload(c: Character, weaponId: string): string {
   return `Заряджено ${take}, у рюкзаку лишилось ${it.qty}.`;
 }
 
+/* ---------- luck ---------- */
+/** What each use of luck costs: ±1 on a check, a reroll of one к10, an automatic success or enemy failure. */
+export const LUCK_COST = { bonus: 1, reroll: 3, auto: 5 } as const;
+export type LuckUse = keyof typeof LUCK_COST;
+export const LUCK_DAWN = 2;
+export const LUCK_DAWN_SAFE = 3;
+
+/** Spends luck on one use; returns false and changes nothing when there is not enough. */
+export function spendLuck(c: Character, use: LuckUse): boolean {
+  const cost = LUCK_COST[use];
+  if (num(c.luck.cur) < cost) return false;
+  c.luck.cur = num(c.luck.cur) - cost;
+  return true;
+}
+/** Dawn at 6:00: +2, or +3 after more than 12 hours in a safe zone, never above the pool. Returns what came back. */
+export function dawnLuck(c: Character, safe: boolean): number {
+  const before = num(c.luck.cur);
+  c.luck.cur = Math.min(num(c.luck.pool), before + (safe ? LUCK_DAWN_SAFE : LUCK_DAWN));
+  return Math.max(0, c.luck.cur - before);
+}
+/** Changes the pool; what is left never exceeds it. */
+export function setLuckPool(c: Character, pool: number): void {
+  c.luck.pool = clamp(Math.round(pool), 0, 99);
+  c.luck.cur = clamp(num(c.luck.cur), 0, c.luck.pool);
+}
+
 /* ---------- creation wizard ---------- */
 export interface Draft {
   step: number;
@@ -291,6 +328,8 @@ export function finishDraft(w: Draft): Character {
   c.freeAttr = Math.max(0, attrLeft(c));
   c.freeSkill = Math.max(0, skillLeft(c));
   c.hp = maxHp(c);
+  setLuckPool(c, num(c.luck.pool));
+  c.luck.cur = c.luck.pool; // a new character starts with the whole pool
   if (w.ab.name.trim()) c.abilities.push({ id: uid(), name: w.ab.name.trim(), text: w.ab.text.trim() });
   c.createdAt = c.updatedAt = Date.now();
   return c;

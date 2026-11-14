@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GUNS, MARKET } from "./data";
-import { SHOT0, addMarketItem, blankCharacter, cartTotals, derive, finishDraft, maxHp, migrate, newDraft, reload, setHp, shotCalc, skillCost, skillLeft, takeDamage, useItem } from "./character";
+import { SHOT0, addMarketItem, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newDraft, reload, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem } from "./character";
 import { decode, encode } from "./codes";
 import type { Character } from "./types";
 
@@ -20,6 +20,9 @@ describe("health and wounds", () => {
   it("wounds start at a quarter, half and three quarters of health lost", () => {
     const c = simka();
     const at = (hp: number) => { c.hp = hp; return derive(c); };
+    expect(at(25).marks).toEqual([18, 12, 6]);
+    expect(at(25).deathAt).toBe(-7);
+    expect([19, 18, 12, 6, 0].map(hp => at(hp).level)).toEqual([0, 1, 2, 3, 4]);
     expect(at(19).wounds).toBe(0);
     expect(at(18).wounds).toBe(1);
     expect(at(18).checkPen).toBe(-1);
@@ -124,6 +127,45 @@ describe("gear", () => {
     useItem(c, c.items[1].id);
     expect(c.rad).toBe(0);
     expect(c.vodka).toBe(1);
+  });
+});
+
+describe("luck", () => {
+  it("costs 1, 3 or 5 and refuses when there is not enough", () => {
+    const c = simka();
+    setLuckPool(c, 8); c.luck.cur = 8;
+    expect(spendLuck(c, "auto")).toBe(true);
+    expect(c.luck.cur).toBe(3);
+    expect(spendLuck(c, "reroll")).toBe(true);
+    expect(c.luck.cur).toBe(0);
+    expect(spendLuck(c, "bonus")).toBe(false);
+    expect(c.luck.cur).toBe(0);
+  });
+
+  it("comes back at dawn, more in a safe zone, never above the pool", () => {
+    const c = simka();
+    setLuckPool(c, 7); c.luck.cur = 1;
+    expect(dawnLuck(c, false)).toBe(2);
+    expect(c.luck.cur).toBe(3);
+    expect(dawnLuck(c, true)).toBe(3);
+    expect(c.luck.cur).toBe(6);
+    expect(dawnLuck(c, true)).toBe(1);
+    expect(c.luck.cur).toBe(7);
+  });
+
+  it("a smaller pool cuts what is left; sheets saved before luck existed get an empty pool", () => {
+    const c = simka();
+    setLuckPool(c, 8); c.luck.cur = 8;
+    setLuckPool(c, 6);
+    expect(c.luck).toEqual({ pool: 6, cur: 6 });
+    expect(migrate({ attrs: { spr: 5 } }).luck).toEqual({ pool: 0, cur: 0 });
+  });
+
+  it("a new character starts with the whole pool, or 0 when the player left it empty", () => {
+    const w = newDraft();
+    w.d.luck.pool = 7;
+    expect(finishDraft(w).luck).toEqual({ pool: 7, cur: 7 });
+    expect(finishDraft(newDraft()).luck).toEqual({ pool: 0, cur: 0 });
   });
 });
 

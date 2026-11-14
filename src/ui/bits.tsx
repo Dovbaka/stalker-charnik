@@ -29,9 +29,9 @@ export function usePersistedString(key: string, initial: string): [string, (v: s
 }
 
 /* ---------- controls ---------- */
-type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { pri?: boolean; dng?: boolean; sm?: boolean; lg?: boolean; sq?: boolean };
-export function Btn({ pri, dng, sm, lg, sq, className, ...rest }: BtnProps) {
-  return <button type="button" className={cx("btn", pri && "pri", dng && "dng", sm && "sm", lg && "lg", sq && "sq", className)} {...rest} />;
+type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { pri?: boolean; dng?: boolean; sm?: boolean; lg?: boolean; sq?: boolean; link?: boolean };
+export function Btn({ pri, dng, sm, lg, sq, link, className, ...rest }: BtnProps) {
+  return <button type="button" className={cx("btn", pri && "pri", dng && "dng", sm && "sm", lg && "lg", sq && "sq", link && "link", className)} {...rest} />;
 }
 
 /** −  value  + */
@@ -79,16 +79,35 @@ export function Confirm({ onConfirm, label = "×", ask = "Видалити?", ti
 }
 
 /* ---------- display ---------- */
-export function Box({ title, ro, children }: { title: string; ro?: boolean; children: ReactNode }) {
-  return <section className="box"><h2>{title}</h2><fieldset disabled={ro}>{children}</fieldset></section>;
+/** A ruled box. `ro` switches every control inside it off; `right` sits at the end of the title strip. */
+export function Box({ title, ro, right, children }: { title: string; ro?: boolean; right?: ReactNode; children: ReactNode }) {
+  return <section className="box"><h2><span>{title}</span>{right}</h2><fieldset disabled={ro}>{children}</fieldset></section>;
 }
-export function Bar({ pct, cls, ticks = [], label, mini }: { pct: number; cls?: string; ticks?: number[]; label?: string; mini?: boolean }) {
+
+/** A horizontal gauge from 0 to `max`, with notches and their numbers underneath. */
+export function Meter({ value, max, cls, marks = [], label, tint, showMax = true }: {
+  value: number; max: number; cls?: string; marks?: number[]; label: string; tint?: string; showMax?: boolean;
+}) {
+  const at = (v: number) => clamp((v / (max || 1)) * 100, 0, 100);
   return (
-    <span className={cx("bar", cls, mini && "mini")} role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true} style={mini ? undefined : { display: "block" }}>
-      <i style={{ width: clamp(pct, 0, 100) + "%" }} />
-      {ticks.map(t => <b key={t} style={{ left: t + "%" }} />)}
-    </span>
+    <div>
+      <div className={cx("meter", cls)} role="img" aria-label={label} style={tint ? { background: tint } : undefined}>
+        <i style={{ width: at(value) + "%" }} />
+        {marks.map(m => <b key={m} style={{ left: at(m) + "%" }} />)}
+      </div>
+      <div className="scale" aria-hidden="true">
+        <span className="first">0</span>
+        {marks.map(m => <span key={m} style={{ left: at(m) + "%" }}>{m}</span>)}
+        {showMax && <span className="end" style={{ left: "100%" }}>{max}</span>}
+      </div>
+    </div>
   );
+}
+
+/** ●●●○○: `on` filled out of `of`. */
+export function Dots({ on, of, cls = "dots" }: { on: number; of: number; cls?: string }) {
+  const n = Math.max(0, Math.min(on, of));
+  return <span className={cls} aria-hidden="true">{"●".repeat(n)}<span className="off">{"●".repeat(Math.max(0, of - n))}</span></span>;
 }
 export function KV({ k, children }: { k: ReactNode; children: ReactNode }) {
   return <div className="kv"><span>{k}</span>{children}</div>;

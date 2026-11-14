@@ -62,10 +62,10 @@ export function Roster({ open, hasDraft, startWizard }: { open: (id: string) => 
 
   const row = (x: (typeof all)[number]) => {
     const c = x.c!;
-    const meta = [x.own ? "" : "гравець: " + x.e.ownerName, c.id.role, `ОЗ ${c.hp}/${maxHp(c)}`].filter(Boolean).join(" · ");
+    const meta = [x.own ? "" : x.e.ownerName, `ОЗ ${c.hp}/${maxHp(c)}`].filter(Boolean).join(" · ");
     return (
       <div className="crow" key={x.e.id}>
-        <div className="nm"><h3>«{c.id.callsign || "Без позивного"}»</h3><span className="hint">{meta}</span></div>
+        <div className="nm"><h3>{c.id.callsign || "Без позивного"}</h3><span className="hint">{meta}</span></div>
         <Btn pri={x.own} onClick={() => open(x.e.id)}>{x.own ? "Відкрити" : "Переглянути"}</Btn>
         {x.own && <>
           <Btn title="Код-копія персонажа" onClick={() => makeCode(x.e.id, false)}>Код</Btn>
@@ -79,9 +79,9 @@ export function Roster({ open, hasDraft, startWizard }: { open: (id: string) => 
 
   return (
     <div>
-      <header className="rt top">
-        <div className="who"><div className="formno">Настільна гра по Зоні · правила майстра</div><h1>Чарнік сталкера</h1></div>
-        <div className="top-r"><span className="sync s-ok">{st.user?.name}</span><Btn sm onClick={() => camp.signOut()}>Вийти</Btn></div>
+      <header className="top">
+        <div className="who"><h1>Чарнік сталкера</h1></div>
+        <div className="top-r"><span className="sync">{st.user?.name}</span><Btn sm onClick={() => camp.signOut()}>Вийти</Btn></div>
       </header>
       {st.error && <div className="warnbar" style={{ marginTop: 12 }}>{st.error}</div>}
       <div className="rgrid">
@@ -98,7 +98,7 @@ export function Roster({ open, hasDraft, startWizard }: { open: (id: string) => 
           <div>{!st.loaded ? wait : others.length ? others.map(row) : <p className="empty">Інших карток поки немає. Вони з'являться тут, коли гравці створять своїх сталкерів.</p>}</div>
         </Box>
         {exp && expChar && (
-          <Box title={`Код-копія «${expChar.id.callsign}»`}>
+          <Box title={`Код-копія: ${expChar.id.callsign}`}>
             <div className="pad">
               <textarea ref={codeBox} className="in code" readOnly aria-label="Код персонажа" value={exp.code || "Готую код."} />
               <div className="row wrapg"><Btn pri onClick={copyCode}>Скопіювати код</Btn><Btn onClick={saveFile}>Зберегти файл</Btn><Btn onClick={() => setExp(null)}>Закрити</Btn></div>

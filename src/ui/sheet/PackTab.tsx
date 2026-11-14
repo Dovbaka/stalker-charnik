@@ -2,14 +2,15 @@ import { useState } from "react";
 import { MARKET, marketName } from "../../rules/data";
 import { addMarketItem, useCharge, useItem } from "../../rules/character";
 import { cx, fmt, kg, num, uid } from "../../util";
-import { Bar, Box, Btn, Check, Confirm, Lab, NumIn, Stepper, Text, toast } from "../bits";
+import { Box, Btn, Check, Confirm, Lab, Meter, NumIn, Stepper, Text, toast } from "../bits";
 import type { SheetApi } from "../Sheet";
 
 export function PackTab(api: SheetApi) {
-  return <><MoneyBox {...api} /><CarryBox {...api} /><ItemsBox {...api} /><ArtifactsBox {...api} /></>;
+  return <><MoneyBox {...api} /><ItemsBox {...api} /><ArtifactsBox {...api} /></>;
 }
 
-function MoneyBox({ c, ro, up }: SheetApi) {
+/** Coupons and the load share a box: both answer "can I take this". */
+function MoneyBox({ c, d, ro, up }: SheetApi) {
   const [amt, setAmt] = useState("");
   const move = (dir: 1 | -1) => {
     const n = Math.round(num(amt, NaN));
@@ -18,35 +19,30 @@ function MoneyBox({ c, ro, up }: SheetApi) {
     up(x => { x.money += n * dir; });
     setAmt("");
   };
-  return (
-    <Box title="Купони" ro={ro}>
-      <div className="pad">
-        <div className="big">{fmt(c.money)}<small> куп.</small></div>
-        <div className="row wrapg">
-          <input className="in w6 num" inputMode="numeric" placeholder="сума" aria-label="Сума" value={amt} onChange={e => setAmt(e.target.value)} />
-          <Btn pri onClick={() => move(1)}>+ Дохід</Btn><Btn onClick={() => move(-1)}>− Витрата</Btn>
-        </div>
-      </div>
-    </Box>
-  );
-}
-
-function CarryBox({ d, ro }: SheetApi) {
   const limit = d.cap * 1.5;
-  const cls = d.over === 2 ? "bad" : d.over === 1 ? "warn" : "";
-  const text = d.over === 2 ? "Понад межу: стільки не понести." : d.over === 1 ? "Перевантаження: Спритність удвічі менша." : "Без штрафу.";
   return (
-    <Box title="Вантаж" ro={ro}>
-      <div className="pad">
-        <div className="row between end"><div className={cx("big", cls)}>{kg(d.weight)}<small>/{d.cap} кг</small></div><div className={d.over ? "neg" : "hint"} style={{ textAlign: "right" }}>{text}</div></div>
-        <Bar pct={(d.weight / (limit || 1)) * 100} cls={cls} ticks={[66.67]} label={`Вантаж ${kg(d.weight)} з ${d.cap} кг`} />
-        <div className="hint">До {d.cap} кг без штрафу, до {kg(limit)} кг зі Спритністю навпіл. Куртка, одяг і ПДА не рахуються.</div>
-      </div>
-    </Box>
+    <div className="stack">
+      <Box title="Купони" ro={ro}>
+        <div className="pad">
+          <div className="big">{fmt(c.money)}</div>
+          <div className="row wrapg">
+            <input className="in w6 num" inputMode="numeric" placeholder="сума" aria-label="Сума" value={amt} onChange={e => setAmt(e.target.value)} />
+            <Btn pri onClick={() => move(1)}>+ Дохід</Btn><Btn onClick={() => move(-1)}>− Витрата</Btn>
+          </div>
+        </div>
+      </Box>
+      <Box title="Вантаж" ro={ro} right={d.over ? <span className={d.over === 2 ? "neg" : "amber"}>{d.over === 2 ? "Понад межу" : "Спритність ÷2"}</span> : undefined}>
+        <div className="pad">
+          <div className="big">{kg(d.weight)}<small> / {d.cap} кг</small></div>
+          <Meter value={d.weight} max={limit} cls={cx("load", d.over === 1 && "over", d.over === 2 && "limit")} marks={[d.cap]} label={`Вантаж ${kg(d.weight)} кг: без штрафу до ${d.cap}, межа ${kg(limit)}`} />
+        </div>
+      </Box>
+    </div>
   );
 }
 
 function ItemsBox({ c, ro, edit, up }: SheetApi) {
+  const [adding, setAdding] = useState(false);
   const [pick, setPick] = useState("0");
   const [buy, setBuy] = useState(false);
   const [name, setName] = useState("");
@@ -66,82 +62,89 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
     setName(""); setQty(""); setWeight("");
   };
   return (
-    <Box title="Рюкзак" ro={ro}>
+    <Box title="Речі" ro={ro} right={!ro && !adding ? <Btn sm onClick={() => setAdding(true)}>+ Додати</Btn> : undefined}>
       <div>
-        {c.items.length === 0 && <p className="empty">Рюкзак порожній. Додай речі зі списку майстра або впиши свої.</p>}
+        {c.items.length === 0 && !adding && <p className="empty">Рюкзак порожній.</p>}
         {c.items.map((it, i) => {
           const q = num(it.qty);
           return (
             <div className={cx("irow", !q && "zero")} key={it.id}>
               <div className="nm">
                 <b>{it.name}</b>
-                {it.note && <span className="hint">{it.note}</span>}
-                {it.uses != null && <span className="hint">використань у початому: {num(it.uses)}</span>}
+                {it.uses != null && q > 0 && <span className="hint">у початому: {num(it.uses)}</span>}
               </div>
-              <Stepper value={q} min={0} max={9999} set={v => up(x => { x.items[i].qty = v; })} />
-              <span className="iw num">{kg(q * num(it.w))} кг</span>
               {it.fx && q > 0 && <Btn sm pri onClick={() => { let msg = ""; up(x => { msg = useItem(x, it.id); }); if (msg) toast(msg); }}>Вжити</Btn>}
               {it.uses != null && !it.fx && q > 0 && <Btn sm onClick={() => up(x => useCharge(x.items[i]))}>Використати</Btn>}
-              <Confirm onConfirm={() => up(x => { x.items.splice(i, 1); })} />
+              <Stepper value={q} min={0} max={9999} set={v => up(x => { x.items[i].qty = v; })} />
+              <span className="iw num">{kg(q * num(it.w))} кг</span>
               {edit && (
                 <div className="fgrid" style={{ flex: "1 1 100%" }}>
                   <Lab name="Назва"><Text value={it.name} set={v => up(x => { x.items[i].name = v; })} /></Lab>
                   <Lab name="Вага однієї, кг"><NumIn value={num(it.w)} set={v => up(x => { x.items[i].w = v; })} /></Lab>
                   <Lab name="Нотатка" wide><Text value={it.note} set={v => up(x => { x.items[i].note = v; })} /></Lab>
+                  <div className="wide"><Confirm sm={false} label="Викинути" ask="Точно викинути?" title="Викинути річ" onConfirm={() => up(x => { x.items.splice(i, 1); })} /></div>
                 </div>
               )}
             </div>
           );
         })}
-        <div className="addf">
-          <div className="lbl">З ринку майстра</div>
-          <div className="row wrapg">
-            <select className="in" aria-label="Що додати" value={pick} onChange={e => setPick(e.target.value)}>{MARKET.map((m, i) => <option key={i} value={i}>{marketName(m)}, {m.p} куп.</option>)}</select>
-            <Btn pri onClick={addFromMarket}>Додати</Btn>
+        {adding && <>
+          <div className="addf">
+            <div className="lbl">З ринку майстра</div>
+            <div className="row wrapg">
+              <select className="in" aria-label="Що додати" value={pick} onChange={e => setPick(e.target.value)}>{MARKET.map((m, i) => <option key={i} value={i}>{marketName(m)}, {m.p} куп.</option>)}</select>
+              <Btn pri onClick={addFromMarket}>Додати</Btn>
+            </div>
+            <Check checked={buy} set={setBuy}>Купити: списати купони</Check>
           </div>
-          <Check checked={buy} set={setBuy}>Купити: списати купони</Check>
-        </div>
-        <div className="addf">
-          <div className="lbl">Своя річ</div>
-          <div className="row wrapg">
-            <input className="in" style={{ flex: "1 1 9em" }} placeholder="Назва" aria-label="Назва речі" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addOwn(); }} />
-            <input className="in w4 num" inputMode="numeric" placeholder="шт" aria-label="Кількість" value={qty} onChange={e => setQty(e.target.value)} />
-            <input className="in w4 num" inputMode="decimal" placeholder="кг" aria-label="Вага однієї, кг" value={weight} onChange={e => setWeight(e.target.value)} />
-            <Btn pri onClick={addOwn}>Додати</Btn>
+          <div className="addf">
+            <div className="lbl">Своя річ</div>
+            <div className="row wrapg">
+              <input className="in" style={{ flex: "1 1 9em" }} placeholder="Назва" aria-label="Назва речі" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addOwn(); }} />
+              <input className="in w4 num" inputMode="numeric" placeholder="шт" aria-label="Кількість" value={qty} onChange={e => setQty(e.target.value)} />
+              <input className="in w4 num" inputMode="decimal" placeholder="кг" aria-label="Вага однієї, кг" value={weight} onChange={e => setWeight(e.target.value)} />
+              <Btn pri onClick={addOwn}>Додати</Btn>
+            </div>
+            <div><Btn onClick={() => setAdding(false)}>Готово</Btn></div>
           </div>
-        </div>
+        </>}
       </div>
     </Box>
   );
 }
 
-function ArtifactsBox({ c, ro, up }: SheetApi) {
+/** Kept simple on purpose: artefact effects wait for the GM's rules. */
+function ArtifactsBox({ c, ro, edit, up }: SheetApi) {
+  const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [fx, setFx] = useState("");
+  if (!edit && !adding && c.artifacts.length === 0) {
+    return ro ? null : <div><Btn link onClick={() => setAdding(true)}>+ Артефакт</Btn></div>;
+  }
   const add = () => {
     const n = name.trim();
     if (!n) { toast("Впиши назву артефакту."); return; }
     up(x => { x.artifacts.push({ id: uid(), name: n, fx: fx.trim() }); });
-    setName(""); setFx("");
+    setName(""); setFx(""); setAdding(false);
   };
   return (
-    <Box title="Артефакти" ro={ro}>
+    <Box title="Артефакти" ro={ro} right={!ro && !adding ? <Btn sm onClick={() => setAdding(true)}>+ Додати</Btn> : undefined}>
       <div>
-        {c.artifacts.length === 0 && <p className="empty">Артефактів немає. У Зону з ними не заходять.</p>}
         {c.artifacts.map((a, i) => (
           <div className="irow" key={a.id}>
             <div className="nm"><b>{a.name}</b>{a.fx && <span className="hint">{a.fx}</span>}</div>
             <Confirm onConfirm={() => up(x => { x.artifacts.splice(i, 1); })} />
           </div>
         ))}
-        <div className="addf">
-          <div className="row wrapg">
-            <input className="in" style={{ flex: "1 1 8em" }} placeholder="Назва" aria-label="Назва артефакту" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") add(); }} />
-            <input className="in" style={{ flex: "2 1 10em" }} placeholder="Що дає" aria-label="Ефект" value={fx} onChange={e => setFx(e.target.value)} onKeyDown={e => { if (e.key === "Enter") add(); }} />
-            <Btn pri onClick={add}>Додати</Btn>
+        {adding && (
+          <div className="addf">
+            <div className="row wrapg">
+              <input className="in" style={{ flex: "1 1 8em" }} placeholder="Назва" aria-label="Назва артефакту" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") add(); }} />
+              <input className="in" style={{ flex: "2 1 10em" }} placeholder="Що дає" aria-label="Ефект" value={fx} onChange={e => setFx(e.target.value)} onKeyDown={e => { if (e.key === "Enter") add(); }} />
+            </div>
+            <div className="row"><Btn pri onClick={add}>Додати</Btn><Btn onClick={() => setAdding(false)}>Скасувати</Btn></div>
           </div>
-          <div className="hint">Контейнерів у броні: {num(c.armor.slots)}. Зміну характеристик від артефакту внеси через «Правити», поле «артефакти й інше».</div>
-        </div>
+        )}
       </div>
     </Box>
   );

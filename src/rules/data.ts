@@ -5,16 +5,15 @@ export const ATTR_PTS = 16;
 export const SKILL_PTS = 18;
 export const START_MONEY = 4000;
 
-export const ATTRS: { key: AttrKey; name: string; short: string; long: string }[] = [
-  { key: "spr", name: "Спритність", short: "рух, скритність, ухилення", long: "Швидкість і мобільність: скільки метрів за хід, скритність, ухилення, швидко дістати зброю." },
-  { key: "til", name: "Тілобудова", short: "здоров'я, сила, вантаж", long: "Витривалість і сила: здоров'я (×5 + 10), удар у ближньому бою, вантаж (×10 кг)." },
-  { key: "spy", name: "Сприйняття", short: "виявлення, уважність", long: "Уважність та інстинкти: помітити ворога, слід чи засідку." },
-  { key: "rea", name: "Реакція", short: "ініціатива", long: "Рефлекси: хто ходить першим у бою." },
-  { key: "mud", name: "Мудрість", short: "знання, лікування", long: "Інтелект і кмітливість: знання, медицина, складні задачі." },
+export const ATTRS: { key: AttrKey; name: string; abbr: string; long: string }[] = [
+  { key: "spr", name: "Спритність", abbr: "Сприт", long: "Швидкість і мобільність: скільки метрів за хід, скритність, ухилення, швидко дістати зброю." },
+  { key: "til", name: "Тілобудова", abbr: "Тіло", long: "Витривалість і сила: здоров'я (×5 + 10), удар у ближньому бою, вантаж (×10 кг)." },
+  { key: "spy", name: "Сприйняття", abbr: "Сприй", long: "Уважність та інстинкти: помітити ворога, слід чи засідку." },
+  { key: "rea", name: "Реакція", abbr: "Реак", long: "Рефлекси: хто ходить першим у бою." },
+  { key: "mud", name: "Мудрість", abbr: "Мудр", long: "Інтелект і кмітливість: знання, медицина, складні задачі." },
 ];
+export const ATTR_ABBR = Object.fromEntries(ATTRS.map(a => [a.key, a.abbr])) as Record<AttrKey, string>;
 export const ATTR_KEYS: AttrKey[] = ATTRS.map(a => a.key);
-/** "к10 + 7 зі Спритністю" */
-export const ATTR_WITH: Record<AttrKey, string> = { spr: "зі Спритністю", til: "із Силою", spy: "зі Сприйняттям", rea: "з Реакцією", mud: "з Мудрістю" };
 
 export const SKILL_GROUPS: { name: string; skills: { key: SkillKey; name: string; attr?: AttrKey }[] }[] = [
   { name: "Бойові", skills: [{ key: "pistols", name: "Пістолети" }, { key: "rifles", name: "Гвинтівки" }, { key: "heavy", name: "Важка зброя" }, { key: "melee", name: "Зброя ближнього бою", attr: "til" }, { key: "unarmed", name: "Без зброї", attr: "til" }] },

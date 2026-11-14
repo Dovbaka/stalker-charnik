@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { derive, type Derived } from "../rules/character";
 import type { Character } from "../rules/types";
 import { useCampaign } from "../state/context";
-import { cx, fmt } from "../util";
-import { Bar, Btn, Trefoil, usePersistedString } from "./bits";
+import { cx } from "../util";
+import { Btn, usePersistedString } from "./bits";
 import { CardTab } from "./sheet/CardTab";
 import { CombatTab } from "./sheet/CombatTab";
 import { NotesTab } from "./sheet/NotesTab";
@@ -22,7 +22,6 @@ export interface SheetApi {
 }
 
 const TABS: [string, string][] = [["sheet", "Картка"], ["combat", "Бій"], ["pack", "Рюкзак"], ["notes", "Нотатки"]];
-const SYNC = { ok: "Збережено", saving: "Зберігаю", err: "Не збережено" };
 
 export function Sheet({ id, menu }: { id: string; menu: () => void }) {
   const [st, camp] = useCampaign();
@@ -47,35 +46,26 @@ export function Sheet({ id, menu }: { id: string; menu: () => void }) {
   const tabs = TABS.map(([k, n]) => (
     <button type="button" key={k} className={cx("tab", current === k && "on")} aria-current={current === k ? "page" : undefined} onClick={() => { setTab(k); window.scrollTo(0, 0); }}>{n}</button>
   ));
-  const status = st.sync === "saving" && !online ? "Без мережі, збережеться потім" : SYNC[st.sync];
+  // Saving is quiet; only a problem is worth a word.
+  const status = !own ? "Лише перегляд" : st.sync === "err" ? "Не збережено" : st.sync === "saving" && !online ? "Без мережі, збережеться потім" : "";
 
   return (
     <div className={cx("sc-sheet", !own && "ro")}>
       <header className="top">
         <div className="who">
-          <div className="formno">Облікова картка сталкера{own ? "" : " · гравець " + owner}</div>
-          <h1>«{c.id.callsign || "Без позивного"}»</h1>
-          <div className="sub">{[c.id.role, c.id.age ? c.id.age + " р." : ""].filter(Boolean).join(", ")}</div>
+          <h1>{c.id.callsign || "Без позивного"}</h1>
+          {!own && <div className="sub">гравець {owner}</div>}
         </div>
         <div className="top-r">
-          <span className={`stamp st-${d.hpCls}`}>{d.label}</span>
-          <span className={`sync s-${own ? st.sync : "ro"}`}>{own ? status : "Лише перегляд"}</span>
-          <div className="row">
+          <span className={`stamp l${d.level}`}>{d.label}</span>
+          <div className="row wrapg" style={{ justifyContent: "flex-end" }}>
+            {status && <span className={cx("sync", own && st.sync === "err" && "s-err", own && st.sync === "saving" && "s-saving")}>{status}</span>}
             <Btn sm onClick={menu}>Персонажі</Btn>
             {own && <Btn sm pri={edit} onClick={() => setEdit(!edit)}>{edit ? "Готово" : "Правити"}</Btn>}
           </div>
         </div>
       </header>
-      <div className="stick">
-        <div className="vit num">
-          <span><b>{c.hp}</b>/{d.max} ОЗ</span>
-          <Bar mini pct={(c.hp / d.max) * 100} cls={d.hpCls} />
-          <span className="amber"><Trefoil /><span><b>{c.rad}</b> рад</span></span>
-          <span><b>{fmt(c.money)}</b> куп.</span>
-          {d.checkPen !== 0 && <span className="neg">{d.checkPen} до перевірок</span>}
-        </div>
-        <nav className="tabs" aria-label="Розділи">{tabs}</nav>
-      </div>
+      <nav className="tabs toptabs" aria-label="Розділи">{tabs}</nav>
       <main className="grid">
         {current === "sheet" && <CardTab {...api} />}
         {current === "combat" && <CombatTab {...api} />}

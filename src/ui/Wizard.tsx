@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ATTRS, ATTR_PTS, GUNS, MARKET, SKILL_GROUPS, SKILL_KEYS, SKILL_NAME, SKILL_PTS, marketName } from "../rules/data";
 import { attrLeft, cartTotals, draftGearList, skillLeft, type Draft } from "../rules/character";
 import { cx, fmt, kg, num } from "../util";
-import { Area, Btn, Lab, Stepper, Text, toast } from "./bits";
+import { Area, Btn, Lab, NumIn, Stepper, Text, toast } from "./bits";
 
 const STEPS = ["Хто", "Характеристики", "Навички", "Спорядження", "Підсумок"];
 
@@ -38,6 +38,7 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
           <Lab name="Ім'я"><Text value={d.id.name} set={v => change(x => { x.d.id.name = v; })} placeholder="Необов'язково" /></Lab>
           <Lab name="Заняття"><Text value={d.id.role} set={v => change(x => { x.d.id.role = v; })} placeholder="Механік, науковиця, мисливець" /></Lab>
           <Lab name="Вік"><Text value={d.id.age} set={v => change(x => { x.d.id.age = v; })} /></Lab>
+          <Lab name="Пул удачі"><NumIn value={num(d.luck.pool)} placeholder="5 + к4" set={v => change(x => { x.d.luck.pool = Math.min(99, Math.round(v)); })} /></Lab>
           <Lab name="Зовнішність" wide><Area value={d.id.looks} set={v => change(x => { x.d.id.looks = v; })} /></Lab>
           <Lab name="Коротко про себе" wide><Area rows={3} value={d.id.about} set={v => change(x => { x.d.id.about = v; })} /></Lab>
         </div>
@@ -127,7 +128,8 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
     body = <>
       <h2>Перевір і створи</h2>
       <div className="pad">
-        <div className="sum"><div className="lbl">Сталкер</div><p><b>«{d.id.callsign}»</b>{d.id.role ? ", " + d.id.role : ""}{d.id.age ? `, ${d.id.age} р.` : ""}</p></div>
+        <div className="sum"><div className="lbl">Сталкер</div><p><b>{d.id.callsign}</b>{d.id.role ? ", " + d.id.role : ""}{d.id.age ? `, ${d.id.age} р.` : ""}</p>
+          <p className="hint">Пул удачі: {num(d.luck.pool) || "не вписано, можна пізніше"}</p></div>
         <div className="sum"><div className="lbl">Характеристики</div><p className="num">{ATTRS.map(a => `${a.name} ${d.attrs[a.key]}`).join(", ")}</p>
           {aLeft > 0 && <p className="amber">Не розподілено {aLeft} б. Вони збережуться як вільні бали.</p>}</div>
         <div className="sum"><div className="lbl">Навички</div><p className="num">{skills}</p>

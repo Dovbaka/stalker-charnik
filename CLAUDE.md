@@ -38,9 +38,20 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 - Players know little S.T.A.L.K.E.R. lore on purpose: no canon factions or names in the interface.
 - Keep it simple: one campaign, a handful of users. No abstractions for scale that is not there.
 
+## Design rules (from the owner, 2026-11-14)
+
+- One fixed theme for everyone. The look must not follow the operating system's light or dark setting.
+- Clean at a glance: numbers and marks instead of sentences. Wound thresholds are ticks on the health bar, not a line of text. No asides like "weight 3 kg, not counted in the load".
+- No roll formulas next to skills or attributes (no "к10 + 6 зі Спритністю"): the GM says what is added.
+- Tabs and what they are for: **Картка** is the general view, open most of the time; **Бій** is for combat; **Рюкзак** is for items; **Нотатки** holds notes and every rules reminder.
+- On Картка: no "Особова справа" box (name and role sit in the header, looks and backstory move to Нотатки) and no "Кидки й рух" box (only the movement speed stays).
+- Style: «Бланк», the dark olive field form (variant А of the mockups at https://claude.ai/artifact/Sfd3NzpT8i5HjGEVK8YSpK), chosen 2026-11-14 with these changes: only the callsign in the header (no role); skill levels as dots, not squares; the health number and bar change colour at each wound threshold (green, yellow, orange, red); the condition is called «Алкоголь», not «Горілка», because beer and the rest exist too.
+- Done in that pass: luck (pool typed in the wizard, may stay 0; spend 1/3/5; +2 at dawn, +3 in safety, never above the pool; +1 per point and luck rerolls in the shot calculator).
+
 ## Roadmap (agreed with the owner, in this order)
 
-1. Luck: a pool of 5 + 1d4 rolled once; spend 1 for ±1 on a check, 3 for a reroll, 5 for automatic success or the enemy's failure; +2 back at dawn, +1 more after 12 hours in a safe zone.
-2. GM role, set by a document in Firestore: sees and edits every sheet, private notes included.
-3. Item database filled by the GM (weapons, artefacts, consumables) that replaces the tables hard-coded in `data.ts`.
-4. Later: simplified NPC sheets for the GM.
+1. Owner's feedback on the redesign, phone and PC, every tab.
+2. GM role, set by a document in Firestore: sees and edits every sheet, private notes included. Saves have to merge by field first, so a GM edit and a player edit at the same moment do not overwrite each other.
+3. Item catalogue filled by the GM (weapons, armour, consumables, ammunition), replacing the tables hard-coded in `data.ts`. Players see only the items the GM has opened and add them to their sheet themselves. Custom items typed on a sheet stay on that sheet and never enter the catalogue.
+4. Artefacts: on hold until the owner has talked to the GM. Do not build artefact effects before that.
+5. Later: simplified NPC sheets for the GM.

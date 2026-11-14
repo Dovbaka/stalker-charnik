@@ -81,6 +81,8 @@ export interface Character {
   abilities: Ability[];
   /** a backstory perk: reroll a missed shot with a bonus */
   reroll: { skill: RerollSkill; bonus: number };
+  /** the GM's optional luck rule: a pool rolled once (5 + к4), `cur` is what is left of it */
+  luck: { pool: number; cur: number };
   notes: string;
   createdAt: number;
   updatedAt: number;
