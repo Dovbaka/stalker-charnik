@@ -1,6 +1,6 @@
 // Pieces shared by several tabs: the health box and the luck buttons.
 import { useState } from "react";
-import { LUCK_COST, setHp, setLuckPool, spendLuck, takeDamage, worn, type DamageType, type LuckUse } from "../../rules/character";
+import { LUCK_COST, protection, setHp, setLuckPool, spendLuck, takeDamage, worn, type DamageType, type LuckUse } from "../../rules/character";
 import { num } from "../../util";
 import { Box, Btn, Check, Dots, EditNum, KV, Meter, Stepper, toast } from "../bits";
 import type { SheetApi } from "../Sheet";
@@ -13,17 +13,17 @@ import type { SheetApi } from "../Sheet";
 export function HealthBox({ c, d, ro, up, combat }: SheetApi & { combat?: boolean }) {
   const [amt, setAmt] = useState("");
   const [type, setType] = useState<DamageType>("kin");
-  const a = worn(c);
-  const arm = (k: "kin" | "acid" | "fire" | "elec") => (a ? `, броня ${num(a[k])}` : "");
+  const a = worn(c), prot = protection(c);
+  const arm = (k: "kin" | "acid" | "fire" | "elec") => (a ? `, броня ${prot[k]}` : "");
   const types: [DamageType, string][] = [["kin", "Кінетика" + arm("kin")], ["none", "Повз броню"], ["acid", "Кислота" + arm("acid")], ["fire", "Вогонь" + arm("fire")], ["elec", "Електрика" + arm("elec")]];
   const amount = () => { const n = Math.round(num(amt, 1)); return n > 0 ? n : 0; };
   const minus = () => {
     const n = amount(); if (!n) return;
     const was = c.hp;
     if (combat && type !== "none") {
-      let res = { real: 0, absorbed: 0 };
+      let res = { real: 0, absorbed: 0, extra: 0 };
       const undo = up(x => { res = takeDamage(x, n, type); });
-      toast(!res.absorbed ? `−${res.real} ОЗ.` : res.real ? `−${res.real} ОЗ, броня зняла ${res.absorbed}.` : "Броня втримала всю шкоду.", undo);
+      toast(res.extra ? `−${res.real} ОЗ, з них ${res.extra} через артефакти.` : !res.absorbed ? `−${res.real} ОЗ.` : res.real ? `−${res.real} ОЗ, броня зняла ${res.absorbed}.` : "Броня втримала всю шкоду.", undo);
     } else {
       let now = was;
       const undo = up(x => { setHp(x, x.hp - n); now = x.hp; });

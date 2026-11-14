@@ -1,9 +1,9 @@
 // Everything the rules compute from a sheet. Pure functions: no React, no Firebase.
 // Functions that take a `c` and return nothing mutate it; call them inside an immer recipe.
 import { clamp, num, uid } from "../util";
-import { DEFAULT_CATALOG, type CatArmor, type Catalog } from "./catalog";
-import { ATTR_KEYS, ATTR_PTS, CUSTOM_GUN, RAD_PEN, SKILL_KEYS, SKILL_NAME, SKILL_PTS, START_MONEY, marketName, modPreset, type GunEntry, type MarketEntry, type ModPreset } from "./data";
-import type { Armor, AttrKey, Character, Item, SkillKey, Weapon } from "./types";
+import { DEFAULT_CATALOG, readArtFx, type CatArmor, type CatArtifact, type Catalog } from "./catalog";
+import { ART_FX_INFO, ART_RARITY, ART_TYPES, ATTR_KEYS, ATTR_PTS, CUSTOM_GUN, RAD_PEN, SKILL_KEYS, SKILL_NAME, SKILL_PTS, START_MONEY, marketName, modPreset, type GunEntry, type MarketEntry, type ModPreset } from "./data";
+import type { Armor, ArtFxKey, ArtRarity, ArtType, Artifact, AttrKey, Character, Item, SkillKey, Weapon } from "./types";
 
 /* ---------- shape ---------- */
 const zeroAttrs = (v: number) => Object.fromEntries(ATTR_KEYS.map(k => [k, v])) as Record<AttrKey, number>;
@@ -65,10 +65,23 @@ export function migrate(raw: unknown): Character {
   }
   const armors = s.armors as Record<string, unknown>[];
   armors.forEach((a, i) => { a.on = !!a.on && armors.findIndex(x => x.on) === i; });
+  s.artifacts = (s.artifacts as Record<string, unknown>[]).map(sheetArtifact);
   delete s.by;
   delete s.secret; // private notes live in their own document
   s.v = 2;
   return s as unknown as Character;
+}
+
+const TYPE_KEYS = new Set<string>(ART_TYPES.map(t => t[0])), RARITY_KEYS = new Set<string>(ART_RARITY.map(r => r[0]));
+const txt = (v: unknown) => (typeof v === "string" ? v : "");
+/** An artefact as stored on a sheet. Before the catalogue an artefact was a name and a line of text («fx»); that text becomes its note. */
+function sheetArtifact(a: Record<string, unknown>): Artifact {
+  const old = typeof a.fx === "string";
+  return {
+    id: String(a.id), name: txt(a.name) || "Артефакт", catId: txt(a.catId),
+    type: TYPE_KEYS.has(txt(a.type)) ? (a.type as ArtType) : "", rarity: RARITY_KEYS.has(txt(a.rarity)) ? (a.rarity as ArtRarity) : "",
+    d: txt(a.d), note: old ? txt(a.fx) : txt(a.note), fx: old ? {} : readArtFx(a.fx), secret: !old && a.secret === true, on: !!a.on,
+  };
 }
 
 /* ---------- budgets ---------- */
@@ -90,19 +103,60 @@ export function setHp(c: Character, v: number): void {
   if (woundsAt(c, c.hp) > before) c.woundsTreated = false;
 }
 export type DamageType = "kin" | "none" | "acid" | "fire" | "elec";
-/** Applies incoming damage through armour; returns what actually got through and what the armour took. */
 /** The armour being worn, or none. */
 export const worn = (c: Character): Armor | undefined => c.armors.find(a => a.on);
 /** Puts one armour on and takes any other off. */
 export function wear(c: Character, id: string): void {
   for (const a of c.armors) a.on = a.id === id ? !a.on : false;
 }
-export function takeDamage(c: Character, amount: number, type: DamageType): { real: number; absorbed: number } {
-  const a = worn(c);
-  const arm = type === "none" || !a ? 0 : num(a[type]);
+/** Applies incoming damage through armour and artefacts; returns what got through, what was stopped, and what artefacts added. */
+export function takeDamage(c: Character, amount: number, type: DamageType): { real: number; absorbed: number; extra: number } {
+  const arm = type === "none" ? 0 : protection(c)[type];
   const real = Math.max(0, amount - arm);
   setHp(c, c.hp - real);
-  return { real, absorbed: Math.min(arm, amount) };
+  return { real, absorbed: Math.max(0, Math.min(arm, amount)), extra: Math.max(0, -arm) };
+}
+
+/* ---------- artefacts ---------- */
+export const MAX_SLOTS = 5;
+/** Artefact containers of the worn armour: none without armour, at most five. */
+export const slotsOf = (c: Character) => clamp(Math.round(num(worn(c)?.slots)), 0, MAX_SLOTS);
+export type ArtState = "off" | "on" | "same" | "noslot";
+/**
+ * What each artefact does now. Worn ones fill the containers in list order; one past the last container does nothing ("noslot").
+ * Identical artefacts do not add up (the rules), so a second copy takes a container and counts for nothing ("same").
+ */
+export function artifactStates(c: Character): Record<string, ArtState> {
+  const out: Record<string, ArtState> = {}, seen = new Set<string>(), cap = slotsOf(c);
+  let used = 0;
+  for (const a of c.artifacts) {
+    if (!a.on) { out[a.id] = "off"; continue; }
+    if (used >= cap) { out[a.id] = "noslot"; continue; }
+    used++;
+    const k = a.catId || a.name.trim().toLowerCase();
+    out[a.id] = seen.has(k) ? "same" : "on";
+    seen.add(k);
+  }
+  return out;
+}
+export type ArtTotals = Record<ArtFxKey, number>;
+/** What the artefacts that work add up to; `only` narrows it, say to the ones the player knows. */
+export function artifactTotals(c: Character, only: (a: Artifact) => boolean = () => true): ArtTotals {
+  const t = Object.fromEntries(ART_FX_INFO.map(f => [f.key, 0])) as ArtTotals;
+  const st = artifactStates(c);
+  for (const a of c.artifacts) if (st[a.id] === "on" && only(a)) for (const f of ART_FX_INFO) t[f.key] += num(a.fx[f.key]);
+  return t;
+}
+/** Armour plus artefacts. Artefacts may take a protection below zero: the wearer then takes that much more. */
+export function protection(c: Character): Record<"kin" | "acid" | "fire" | "elec" | "rad", number> {
+  const a = worn(c), t = artifactTotals(c);
+  return { kin: num(a?.kin) + t.kin, acid: num(a?.acid) + t.acid, fire: num(a?.fire) + t.fire, elec: num(a?.elec) + t.elec, rad: num(a?.rad) + t.rad };
+}
+/** The radiation worn artefacts add (+) or draw out (−) at the start of each turn, in words. */
+export const radTurnText = (v: number) => (v > 0 ? `Артефакти: +${v} рад на початку кожного ходу.` : `Артефакти виводять ${-v} рад на початку кожного ходу.`);
+/** Takes an artefact from the catalogue as a copy; it goes to the backpack, not into a container. */
+export function addArtifact(c: Character, e: CatArtifact, id = uid()): void {
+  c.artifacts.push({ id, name: e.n, catId: e.id, type: e.type, rarity: e.rarity, d: e.d, note: e.note, fx: { ...e.fx }, secret: e.secret, on: false });
 }
 
 /** What the load is made of: the backpack, the weapons, and the armour when it is counted. */
@@ -175,6 +229,8 @@ export function derive(c: Character): Derived {
   if (c.noSleep >= 2) for (const k of ATTR_KEYS) add(k, k === "til" ? -1 : -2, "без сну");
   add("til", -c.noFood, "голод"); add("til", -c.noWater, "спрага");
   for (const k of ATTR_KEYS) add(k, num(c.attrMod[k]), "інше");
+  const art = artifactTotals(c);
+  for (const k of ATTR_KEYS) add(k, art[k], "артефакти");
 
   const calc = (k: AttrKey) => {
     let v = num(c.attrs[k]) + lines[k].reduce((s, x) => s + x[1], 0);

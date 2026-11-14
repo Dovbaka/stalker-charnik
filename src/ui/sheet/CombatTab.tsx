@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { MOD_INFO, SKILL_NAME } from "../../rules/data";
-import { FIRE_MODES, SHOT0, hasMod, quickDraw, rangedWeapons, reload, resolveShot, shotCalc, weaponModes, worn, type ShotOpts } from "../../rules/character";
+import { FIRE_MODES, SHOT0, artifactStates, artifactTotals, hasMod, protection, quickDraw, radTurnText, rangedWeapons, reload, resolveShot, shotCalc, weaponModes, worn, type ShotOpts } from "../../rules/character";
 import { clamp, cx, num, sign } from "../../util";
 import { Box, Btn, Check, KV, Stepper, Tg, toast, usePersisted } from "../bits";
 import type { SheetApi } from "../Sheet";
@@ -150,13 +150,15 @@ function GunsBox({ c, d, ro, up }: SheetApi) {
 
 /** The armour being worn and the gas mask. Other armour waits in «Рюкзак». */
 function ArmorBox({ c, ro, up }: SheetApi) {
-  const a = worn(c);
-  const tiles: [string, number][] = a ? [["Кінет", a.kin], ["Кисл", a.acid], ["Вогонь", a.fire], ["Елект", a.elec], ["Рад", num(a.rad) + (c.mask ? 5 : 0)]] : [];
+  const a = worn(c), p = protection(c), art = artifactTotals(c);
+  const withArt = Object.values(artifactStates(c)).includes("on");
+  const tiles: [string, number][] = a ? [["Кінет", p.kin], ["Кисл", p.acid], ["Вогонь", p.fire], ["Елект", p.elec], ["Рад", p.rad + (c.mask ? 5 : 0)]] : [];
   return (
     <Box title="Броня" ro={ro}>
       <div className="pad">
-        {a ? <><b>{a.name}</b><div className="prot">{tiles.map(t => <div key={t[0]}><b>{num(t[1])}</b><span>{t[0]}</span></div>)}</div></>
+        {a ? <><b>{a.name}{withArt && <span className="hint"> · з артефактами</span>}</b><div className="prot">{tiles.map(t => <div key={t[0]}><b className={cx(t[1] < 0 && "neg")}>{t[1] < 0 ? "−" + -t[1] : num(t[1])}</b><span>{t[0]}</span></div>)}</div></>
           : <span className="hint">Броню не надіто.</span>}
+        {art.radTurn !== 0 && <div className={art.radTurn > 0 ? "amber" : "hint"}>{radTurnText(art.radTurn)}</div>}
         <Check checked={c.mask} set={v => up(x => { x.mask = v; })}>Протигаз: +5 від радіації, −1 до влучання</Check>
       </div>
     </Box>

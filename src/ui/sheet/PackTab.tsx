@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { forViewer, gunGroups, itemGroups } from "../../rules/catalog";
-import { MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName, modPreset } from "../../rules/data";
-import { addArmor, addGun, addMarketItem, newArmor, newMod, useCharge, useItem, wear, weightParts } from "../../rules/character";
-import type { SkillKey } from "../../rules/types";
+import { ART_FX_INFO, ART_RARITY, ART_TYPES, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName, modPreset } from "../../rules/data";
+import { MAX_SLOTS, addArmor, addArtifact, addGun, addMarketItem, artifactStates, artifactTotals, newArmor, newMod, slotsOf, useCharge, useItem, wear, weightParts, worn } from "../../rules/character";
+import type { ArtFx, Artifact, SkillKey } from "../../rules/types";
 import { useCampaign } from "../../state/context";
 import { cx, fmt, kg, num, uid } from "../../util";
 import { Box, Btn, Check, Confirm, Lab, Meter, NumIn, Stepper, Text, toast } from "../bits";
@@ -20,8 +20,8 @@ const hiddenMark = (hidden?: boolean) => (hidden ? " · приховано" : ""
 export function PackTab(api: SheetApi) {
   return <>
     <div className="col"><MoneyBox {...api} /></div>
-    <div className="col"><WeaponsBox {...api} /><ArmorsBox {...api} /></div>
-    <div className="col"><ItemsBox {...api} /><ArtifactsBox {...api} /></div>
+    <div className="col"><WeaponsBox {...api} /><ArmorsBox {...api} /><ArtifactsBox {...api} /></div>
+    <div className="col"><ItemsBox {...api} /></div>
   </>;
 }
 
@@ -176,7 +176,7 @@ function ArmorsBox({ c, ro, edit, up }: SheetApi) {
   const [buy, setBuy] = useState(false);
   const cat = useCatalog();
   const field = (i: number, name: string, key: "kin" | "acid" | "fire" | "elec" | "rad" | "w" | "slots") =>
-    <Lab name={name}><NumIn value={num(c.armors[i][key])} set={v => up(x => { x.armors[i][key] = v; })} /></Lab>;
+    <Lab name={name}><NumIn value={num(c.armors[i][key])} set={v => up(x => { x.armors[i][key] = key === "slots" ? Math.min(MAX_SLOTS, Math.round(v)) : v; })} /></Lab>;
   // an own armour starts blank, so its fields open at once
   const addOwn = () => { const a = newArmor(); toast("Додано: своя броня.", up(x => { x.armors.push({ ...a }); })); setOpen(a.id); setAdding(false); };
   const add = () => {
@@ -326,36 +326,100 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
   );
 }
 
-/** Kept simple on purpose: artefact effects wait for the GM's rules. */
+const TYPE_NAME = Object.fromEntries(ART_TYPES) as Record<string, string>;
+const RARITY_NAME = Object.fromEntries(ART_RARITY) as Record<string, string>;
+const signed = (v: number) => (v > 0 ? "+" : "−") + Math.abs(v);
+/** Artefact effects as short chips: "+1 Спритність", "−4 захист від електрики", "+5 рад за хід". Green helps, red hurts. */
+export function FxChips({ fx }: { fx: ArtFx }) {
+  const xs = ART_FX_INFO.filter(f => num(fx[f.key]) !== 0);
+  if (!xs.length) return null;
+  return <div className="chips">{xs.map(f => { const v = num(fx[f.key]); return <span key={f.key} className={cx("chip", v * f.good > 0 ? "good" : "bad")}>{signed(v)} {f.short}</span>; })}</div>;
+}
+
+/**
+ * Artefacts come from the GM's catalogue. Ticking «У контейнері» puts one into a container of the worn armour; the rules then count
+ * its numbers into attributes and protection. A player sees an artefact's properties only once the GM has made them known.
+ */
 function ArtifactsBox({ c, ro, edit, up }: SheetApi) {
+  const [st] = useCampaign();
+  const cat = useCatalog();
   const [adding, setAdding] = useState(false);
-  const [name, setName] = useState("");
-  const [fx, setFx] = useState("");
-  if (!edit && !adding && c.artifacts.length === 0) {
-    return ro ? null : <div><Btn link onClick={() => setAdding(true)}>+ Артефакт</Btn></div>;
-  }
+  const [open, setOpen] = useState("");
+  const [pick, setPick] = useState("");
+  const [buy, setBuy] = useState(false);
+  if (ro && c.artifacts.length === 0) return null;
+  const states = artifactStates(c), cap = slotsOf(c), armour = worn(c);
+  const used = Object.values(states).filter(x => x === "on" || x === "same").length;
+  // the GM sees everything; a player sees what the GM revealed on this sheet or made public in the catalogue
+  const known = (a: Artifact) => st.gm || !a.secret || st.catalog.artifacts.find(x => x.id === a.catId)?.secret === false;
+  const working = c.artifacts.filter(a => states[a.id] === "on");
+  const sum = artifactTotals(c, known), unknownOn = working.some(a => !known(a));
+  const picked = cat.artifacts.find(x => x.id === pick) ?? cat.artifacts[0];
   const add = () => {
-    const n = name.trim();
-    if (!n) { toast("Немає назви."); return; }
-    up(x => { x.artifacts.push({ id: uid(), name: n, fx: fx.trim() }); });
-    setName(""); setFx(""); setAdding(false);
+    const e = picked;
+    if (!e) { toast(NOT_IN_CATALOG); return; }
+    if (buy && e.p && c.money < e.p) { toast(`Не вистачає купонів: треба ${e.p}.`); return; }
+    const undo = up(x => { if (buy && e.p) x.money -= e.p; addArtifact(x, e); });
+    toast(buy && e.p ? `Куплено: ${e.n}, −${e.p} куп.` : `Додано: ${e.n}.`, undo);
+    setAdding(false);
   };
   return (
     <Box title="Артефакти" ro={ro} right={!ro && !adding ? <Btn sm onClick={() => setAdding(true)}>+ Додати</Btn> : undefined}>
       <div>
-        {c.artifacts.map((a, i) => (
-          <div className="irow" key={a.id}>
-            <div className="nm"><b>{a.name}</b>{a.fx && <span className="hint">{a.fx}</span>}</div>
-            <Confirm onConfirm={() => toast(`Викинуто: ${a.name}.`, up(x => { x.artifacts.splice(i, 1); }))} />
+        <div className="pad hint">
+          {!armour ? "Броню не надіто: артефакти нікуди вкласти." : cap ? `Контейнери: ${used} з ${cap} · ${armour.name}` : `У броні «${armour.name}» контейнерів немає.`}
+        </div>
+        {c.artifacts.length === 0 && !adding && <p className="empty">Артефактів немає.</p>}
+        {c.artifacts.map((a, i) => {
+          const isOpen = open === a.id, k = known(a), stt = states[a.id];
+          return (
+            <div className="card" key={a.id}>
+              <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                <b style={{ overflowWrap: "anywhere" }}>{a.name}</b>
+                {(a.type || a.rarity) && <span className="hint">{[TYPE_NAME[a.type], RARITY_NAME[a.rarity]].filter(Boolean).join(" · ")}</span>}
+              </div>
+              {k ? <><FxChips fx={a.fx} />{a.note && <span className="hint">{a.note}</span>}</> : <span className="hint">Властивості невідомі.</span>}
+              {stt === "noslot" && <div className="neg">Не діє: {cap ? `контейнерів лише ${cap}` : "немає вільного контейнера"}.</div>}
+              {stt === "same" && <div className="neg">Не діє: такий самий уже працює, однакові не сумуються.</div>}
+              <div className="row between">
+                <Check checked={a.on} disabled={ro || (!a.on && used >= cap)} set={v => up(x => { x.artifacts[i].on = v; })}>У контейнері</Check>
+                {!ro && !edit && <Btn sm pri={isOpen} onClick={() => setOpen(isOpen ? "" : a.id)}>{isOpen ? "Готово" : "Змінити"}</Btn>}
+              </div>
+              {(edit || isOpen) && !ro && <>
+                {a.d && <span className="hint">{a.d}</span>}
+                {st.gm && <Check checked={!a.secret} set={v => up(x => { x.artifacts[i].secret = !v; })}>Властивості відомі гравцю</Check>}
+                <div><Confirm sm={false} label="Викинути" ask="Точно викинути?" title="Викинути артефакт" onConfirm={() => toast(`Викинуто: ${a.name}.`, up(x => { x.artifacts.splice(i, 1); }))} /></div>
+              </>}
+            </div>
+          );
+        })}
+        {working.length > 0 && (
+          <div className="pad artsum">
+            <span className="lbl">Разом від артефактів</span>
+            <FxChips fx={sum} />
+            {unknownOn && <span className="hint">{ART_FX_INFO.some(f => sum[f.key] !== 0) ? "І ще щось від артефактів із невідомими властивостями." : "Діють артефакти з невідомими властивостями."}</span>}
           </div>
-        ))}
+        )}
         {adding && (
           <div className="addf">
-            <div className="row wrapg">
-              <input className="in" style={{ flex: "1 1 8em" }} placeholder="Назва" aria-label="Назва артефакту" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") add(); }} />
-              <input className="in" style={{ flex: "2 1 10em" }} placeholder="Що дає" aria-label="Ефект" value={fx} onChange={e => setFx(e.target.value)} onKeyDown={e => { if (e.key === "Enter") add(); }} />
-            </div>
-            <div className="row"><Btn pri onClick={add}>Додати</Btn><Btn onClick={() => setAdding(false)}>Скасувати</Btn></div>
+            {cat.artifacts.length ? <>
+              <div className="row wrapg">
+                <select className="in" aria-label="Який артефакт додати" value={picked?.id ?? ""} onChange={e => setPick(e.target.value)}>
+                  {ART_TYPES.map(([t, tn]) => {
+                    const xs = cat.artifacts.filter(x => x.type === t);
+                    return xs.length ? <optgroup key={t} label={tn}>{xs.map(x => <option key={x.id} value={x.id}>{x.n}{x.p ? `, ${x.p} куп.` : ""}{hiddenMark(x.hidden)}</option>)}</optgroup> : null;
+                  })}
+                </select>
+                <Btn pri onClick={add}>Додати</Btn>
+                <Btn onClick={() => setAdding(false)}>Скасувати</Btn>
+              </div>
+              {picked && <span className="hint">{[RARITY_NAME[picked.rarity], picked.d].filter(Boolean).join(". ")}</span>}
+              {picked && (st.gm || !picked.secret) ? <FxChips fx={picked.fx} /> : picked && <span className="hint">Властивості невідомі.</span>}
+              {picked?.p ? <Check checked={buy} set={setBuy}>Купити: списати купони</Check> : null}
+            </> : <>
+              <p className="empty">Майстер ще не додав артефактів.</p>
+              <div><Btn onClick={() => setAdding(false)}>Скасувати</Btn></div>
+            </>}
           </div>
         )}
       </div>

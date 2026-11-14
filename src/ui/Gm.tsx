@@ -2,14 +2,16 @@
 // Taking a thing copies it into the sheet, so editing or deleting an entry here never changes anyone's sheet.
 import { useState, type ReactNode } from "react";
 import { navigate } from "../router";
-import { DEFAULT_CATALOG, ITEM_FX, gunGroups, itemGroups, newCatArmor, newCatGun, newCatItem, type CatArmor, type CatGun, type CatItem, type CatKind } from "../rules/catalog";
-import { GUN_GROUPS, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName } from "../rules/data";
-import type { ItemEffect, ModKind, SkillKey } from "../rules/types";
+import { DEFAULT_CATALOG, ITEM_FX, gunGroups, itemGroups, newCatArmor, newCatArtifact, newCatGun, newCatItem, type CatArmor, type CatArtifact, type CatGun, type CatItem, type CatKind } from "../rules/catalog";
+import { ART_FX_INFO, ART_RARITY, ART_TYPES, GUN_GROUPS, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName } from "../rules/data";
+import type { ArtFxKey, ArtRarity, ArtType, ItemEffect, ModKind, SkillKey } from "../rules/types";
+import { FxChips } from "./sheet/PackTab";
 import { useCampaign } from "../state/context";
 import { cx, kg } from "../util";
-import { Box, Btn, Check, Confirm, IconPeople, Lab, NumIn, Text } from "./bits";
+import { Area, Box, Btn, Check, Confirm, IconPeople, Lab, NumIn, Text } from "./bits";
 
-const KINDS: [CatKind, string][] = [["guns", "Зброя"], ["armors", "Броня"], ["items", "Речі"]];
+const KINDS: [CatKind, string][] = [["guns", "Зброя"], ["armors", "Броня"], ["items", "Речі"], ["artifacts", "Артефакти"]];
+const RARITY_NAME = Object.fromEntries(ART_RARITY) as Record<string, string>;
 const RANGES = ["Близька", "Коротка", "Середня", "Далека", "Екстремальна"];
 
 export function GmMenu() {
@@ -23,9 +25,11 @@ export function GmMenu() {
   const updGun = (id: string, fn: (x: CatGun) => void) => camp.updateCatalog(c => { const x = c.guns.find(e => e.id === id); if (x) fn(x); });
   const updItem = (id: string, fn: (x: CatItem) => void) => camp.updateCatalog(c => { const x = c.items.find(e => e.id === id); if (x) fn(x); });
   const updArmor = (id: string, fn: (x: CatArmor) => void) => camp.updateCatalog(c => { const x = c.armors.find(e => e.id === id); if (x) fn(x); });
+  const updArt = (id: string, fn: (x: CatArtifact) => void) => camp.updateCatalog(c => { const x = c.artifacts.find(e => e.id === id); if (x) fn(x); });
   const remove = (k: CatKind, id: string) => camp.updateCatalog(c => {
     if (k === "guns") c.guns = c.guns.filter(e => e.id !== id);
     else if (k === "items") c.items = c.items.filter(e => e.id !== id);
+    else if (k === "artifacts") c.artifacts = c.artifacts.filter(e => e.id !== id);
     else c.armors = c.armors.filter(e => e.id !== id);
   });
   const add = () => {
@@ -33,6 +37,7 @@ export function GmMenu() {
     camp.updateCatalog(c => {
       if (kind === "guns") { const e = newCatGun(); id = e.id; c.guns.push(e); }
       else if (kind === "items") { const e = newCatItem(); id = e.id; c.items.push(e); }
+      else if (kind === "artifacts") { const e = newCatArtifact(); id = e.id; c.artifacts.push(e); }
       else { const e = newCatArmor(); id = e.id; c.armors.push(e); }
     });
     setQ(""); setOpen(id);
@@ -79,6 +84,25 @@ export function GmMenu() {
         </div>
       ))}
     </>;
+  } else if (kind === "artifacts") {
+    const list = cat.artifacts.filter(a => match(a.n));
+    body = ART_TYPES.map(([t, tn]) => {
+      const xs = list.filter(a => a.type === t);
+      if (!xs.length) return null;
+      return (
+        <div key={t}>
+          <div className="wgh lbl">{tn}</div>
+          {xs.map(a => (
+            <Entry key={a.id} id={a.id} name={a.n} price={a.p} hidden={!!a.hidden} open={open === a.id} toggle={() => toggle(a.id)}
+              meta={[RARITY_NAME[a.rarity], a.secret ? "властивості приховані" : "властивості відомі"].join(" · ")} extra={a.note}
+              chips={<FxChips fx={a.fx} />}
+              setHidden={v => updArt(a.id, x => { if (v) x.hidden = true; else delete x.hidden; })} remove={() => remove("artifacts", a.id)}>
+              <ArtifactFields a={a} set={fn => updArt(a.id, fn)} />
+            </Entry>
+          ))}
+        </div>
+      );
+    });
   } else {
     const list = cat.armors.filter(a => match(a.n));
     body = list.map(a => (
@@ -123,8 +147,8 @@ export function GmMenu() {
 }
 
 /** One catalogue entry: name, numbers and price; «Змінити» opens its fields, hiding and deleting. */
-function Entry({ id, name, meta, extra, price, hidden, open, toggle, setHidden, remove, children }: {
-  id: string; name: string; meta: string; extra?: string; price: number; hidden: boolean; open: boolean;
+function Entry({ id, name, meta, extra, chips, price, hidden, open, toggle, setHidden, remove, children }: {
+  id: string; name: string; meta: string; extra?: string; chips?: ReactNode; price: number; hidden: boolean; open: boolean;
   toggle: () => void; setHidden: (v: boolean) => void; remove: () => void; children: ReactNode;
 }) {
   return (
@@ -133,6 +157,7 @@ function Entry({ id, name, meta, extra, price, hidden, open, toggle, setHidden, 
         <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
           <b style={{ overflowWrap: "anywhere" }}>{name}{hidden && <span className="chip tagc">приховано</span>}</b>
           {meta && <span className="hint num">{meta}</span>}
+          {chips}
           {extra && <span className="hint">{extra}</span>}
         </div>
         <div className="row" style={{ flex: "none" }}>
@@ -214,13 +239,54 @@ function ItemFields({ m, set }: { m: CatItem; set: (fn: (x: CatItem) => void) =>
 
 function ArmorFields({ a, set }: { a: CatArmor; set: (fn: (x: CatArmor) => void) => void }) {
   const field = (name: string, key: "kin" | "acid" | "fire" | "elec" | "rad" | "w" | "slots" | "p") =>
-    <Lab name={name}><NumIn value={a[key]} set={v => set(x => { x[key] = key === "w" ? v : Math.round(v); })} /></Lab>;
+    <Lab name={name}><NumIn value={a[key]} set={v => set(x => { x[key] = key === "w" ? v : key === "slots" ? Math.min(5, Math.round(v)) : Math.round(v); })} /></Lab>;
   return (
     <div className="fgrid">
       <Lab name="Назва" wide><Text value={a.n} set={v => set(x => { x.n = v; })} /></Lab>
       {field("Кінетика", "kin")}{field("Кислота", "acid")}{field("Вогонь", "fire")}{field("Електрика", "elec")}{field("Радіація", "rad")}
-      {field("Вага, кг", "w")}{field("Контейнери", "slots")}{field("Ціна, куп.", "p")}
+      {field("Вага, кг", "w")}{field("Контейнери, 0–5", "slots")}{field("Ціна, куп.", "p")}
       <Lab name="Опис" wide><Text value={a.note ?? ""} set={v => set(x => { if (v) x.note = v; else delete x.note; })} /></Lab>
+    </div>
+  );
+}
+
+/**
+ * One artefact. Effects the sheet counts are picked from a list and given a number; only the picked ones show.
+ * Anything the sheet cannot count (bleeding, healing) goes in words. New artefacts keep their properties from players.
+ */
+function ArtifactFields({ a, set }: { a: CatArtifact; set: (fn: (x: CatArtifact) => void) => void }) {
+  const [pick, setPick] = useState<ArtFxKey | "">("");
+  const have = ART_FX_INFO.filter(f => a.fx[f.key] !== undefined), free = ART_FX_INFO.filter(f => a.fx[f.key] === undefined);
+  const next = free.find(f => f.key === pick) ?? free[0];
+  return (
+    <div className="fgrid">
+      <Lab name="Назва" wide><Text value={a.n} set={v => set(x => { x.n = v; })} /></Lab>
+      <Lab name="Тип"><select className="in" value={a.type} onChange={e => set(x => { x.type = e.target.value as ArtType; })}>{ART_TYPES.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Lab>
+      <Lab name="Поширеність"><select className="in" value={a.rarity} onChange={e => set(x => { x.rarity = e.target.value as ArtRarity; })}>{ART_RARITY.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Lab>
+      <Lab name="Ціна, куп."><NumIn value={a.p} set={v => set(x => { x.p = Math.round(v); })} /></Lab>
+      <Lab name="Опис" wide><Area value={a.d} rows={2} set={v => set(x => { x.d = v; })} /></Lab>
+      <div className="fl wide">
+        <span>Ефекти, які чарнік рахує сам</span>
+        {have.length === 0 && <div className="hint">Жодного. Додай зі списку нижче.</div>}
+        {have.map(f => (
+          <div className="row fxrow" key={f.key}>
+            <span className="fxn">{f.name}</span>
+            <NumIn className="w4 num" min={-99} label={f.name} value={a.fx[f.key] ?? 0} set={v => set(x => { x.fx[f.key] = Math.round(v); })} />
+            <Btn sm aria-label={`Прибрати: ${f.name}`} onClick={() => set(x => { delete x.fx[f.key]; })}>×</Btn>
+          </div>
+        ))}
+        {next && (
+          <div className="row wrapg">
+            <select className="in" aria-label="Який ефект додати" value={next.key} onChange={e => setPick(e.target.value as ArtFxKey)}>
+              {free.map(f => <option key={f.key} value={f.key}>{f.name}</option>)}
+            </select>
+            <Btn onClick={() => { set(x => { x.fx[next.key] = next.key === "radTurn" ? 5 : 1; }); setPick(""); }}>Додати ефект</Btn>
+          </div>
+        )}
+        <div className="hint">Мінус ослаблює: −4 захисту від електрики означає +4 шкоди електрикою. У радіації за хід плюс накопичує, мінус виводить.</div>
+      </div>
+      <Lab name="Інші ефекти словами" wide><Text value={a.note} placeholder="кровотеча, лікування" set={v => set(x => { x.note = v; })} /></Lab>
+      <Check wide checked={a.secret} set={v => set(x => { x.secret = v; })}>Властивості приховані від гравців</Check>
     </div>
   );
 }

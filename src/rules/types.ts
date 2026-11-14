@@ -57,7 +57,29 @@ export type ModKind =
   | "other";
 export interface WeaponMod { id: string; name: string; kind: ModKind; bonus: number }
 
-export interface Artifact { id: string; name: string; fx: string }
+export type ArtType = "grav" | "therm" | "elec" | "chem" | "unique";
+export type ArtRarity = "common" | "rare" | "unique";
+/** What an artefact changes: an attribute, a protection, or the radiation it adds (+) or draws out (−) at the start of each turn. */
+export type ArtFxKey = AttrKey | "kin" | "acid" | "fire" | "elec" | "rad" | "radTurn";
+export type ArtFx = Partial<Record<ArtFxKey, number>>;
+/** An artefact the character carries: a copy of a catalogue entry. */
+export interface Artifact {
+  id: string;
+  name: string;
+  /** the catalogue entry it came from; "" for artefacts typed in before the catalogue existed */
+  catId: string;
+  type: ArtType | "";
+  rarity: ArtRarity | "";
+  /** what it looks like and where it is found */
+  d: string;
+  /** effects the sheet does not count, in words: bleeding, healing */
+  note: string;
+  fx: ArtFx;
+  /** properties hidden from the player until the GM reveals them */
+  secret: boolean;
+  /** in a container of the worn armour */
+  on: boolean;
+}
 export interface Ability { id: string; name: string; text: string }
 
 export interface Armor {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CATALOG } from "./catalog";
+import { DEFAULT_CATALOG, readCatalog } from "./catalog";
 import { GUNS, MARKET, modPreset } from "./data";
-import { SHOT0, migrateCart, addArmor, addGun, newMod, addMarketItem, quickDraw, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newArmor, newDraft, rangedWeapons, reload, resolveShot, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem, wear, weaponModes, weightParts, worn } from "./character";
+import { SHOT0, migrateCart, addArmor, addArtifact, artifactStates, artifactTotals, protection, addGun, newMod, addMarketItem, quickDraw, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newArmor, newDraft, rangedWeapons, reload, resolveShot, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem, wear, weaponModes, weightParts, worn } from "./character";
 import { decode, encode } from "./codes";
 import type { Character } from "./types";
 
@@ -49,7 +49,7 @@ describe("health and wounds", () => {
 
   it("armour takes its share of damage", () => {
     const c = simka();
-    expect(takeDamage(c, 9, "kin")).toEqual({ real: 7, absorbed: 2 });
+    expect(takeDamage(c, 9, "kin")).toEqual({ real: 7, absorbed: 2, extra: 0 });
     expect(c.hp).toBe(18);
     expect(takeDamage(c, 2, "kin").real).toBe(0);
     expect(takeDamage(c, 3, "none").real).toBe(3);
@@ -355,5 +355,52 @@ describe("stored sheets", () => {
     expect(code.startsWith("Z1.")).toBe(true);
     expect(await decode("посилання https://x/#c=" + code)).toEqual(c);
     await expect(decode("не код")).rejects.toThrow("fmt");
+  });
+});
+
+describe("artefacts", () => {
+  const art = (n: string) => DEFAULT_CATALOG.artifacts.find(a => a.n === n)!;
+
+  it("the standard catalogue carries the GM's artefacts, properties hidden by default", () => {
+    expect(DEFAULT_CATALOG.artifacts).toHaveLength(26);
+    expect(art("Бенгальський вогонь")).toMatchObject({ id: "r-18", type: "elec", rarity: "common", fx: { spr: 1, elec: -4 }, secret: true });
+  });
+
+  it("a stored catalogue from before artefacts gets the built-in ones; an emptied list stays empty; containers stay within 0..5", () => {
+    expect(readCatalog({ guns: [], items: [], armors: [] })!.artifacts).toHaveLength(26);
+    expect(readCatalog({ guns: [], items: [], armors: [], artifacts: [] })!.artifacts).toHaveLength(0);
+    const cat = readCatalog({ armors: [{ n: "Екзо+", slots: 9 }], artifacts: [{ n: "X", fx: { spr: 0, kin: 2, bogus: 3, elec: "1" } }] })!;
+    expect(cat.armors[0].slots).toBe(5);
+    expect(cat.artifacts[0]).toMatchObject({ n: "X", fx: { spr: 0, kin: 2 }, secret: true });
+    expect("bogus" in cat.artifacts[0].fx || "elec" in cat.artifacts[0].fx).toBe(false);
+  });
+
+  it("an artefact typed in before the catalogue keeps its text as a note", () => {
+    const c = migrate({ artifacts: [{ id: "a", name: "Медуза", fx: "+1 кінетика" }] });
+    expect(c.artifacts[0]).toMatchObject({ id: "a", name: "Медуза", catId: "", note: "+1 кінетика", fx: {}, secret: false, on: false });
+  });
+
+  it("only worn ones in the worn armour's containers count, and identical ones count once", () => {
+    const c = simka(); // the leather jacket: one container
+    addArtifact(c, art("Бенгальський вогонь"), "b1");
+    addArtifact(c, art("Медуза"), "m1");
+    expect(c.artifacts.every(a => !a.on)).toBe(true);
+    expect(derive(c).eff.spr).toBe(5);
+    c.artifacts[0].on = true; c.artifacts[1].on = true;
+    expect(artifactStates(c)).toEqual({ b1: "on", m1: "noslot" });
+    const d = derive(c);
+    expect(d.eff.spr).toBe(6);
+    expect(d.lines.spr).toContainEqual(["артефакти", 1]);
+    expect(protection(c)).toMatchObject({ kin: 2, elec: -2 });
+    expect(takeDamage(c, 5, "elec")).toEqual({ real: 7, absorbed: 0, extra: 2 });
+    wear(c, c.armors[0].id); // jacket off: no containers at all
+    expect(artifactStates(c)).toEqual({ b1: "noslot", m1: "noslot" });
+    expect(derive(c).eff.spr).toBe(5);
+    const suit = { ...newArmor(), name: "СЕВА", slots: 4 };
+    c.armors.push(suit); wear(c, suit.id);
+    addArtifact(c, art("Бенгальський вогонь"), "b2"); c.artifacts[2].on = true;
+    expect(artifactStates(c)).toEqual({ b1: "on", m1: "on", b2: "same" });
+    expect(artifactTotals(c)).toMatchObject({ spr: 1, elec: -4, kin: 1, radTurn: 5 });
+    expect(artifactTotals(c, a => a.catId !== art("Медуза").id).radTurn).toBe(0);
   });
 });

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ATTRS, RAD_FX, RAD_STAGE, REROLL_OPTIONS, SKILL_GROUPS, SKILL_KEYS } from "../../rules/data";
-import { maxHp, setLuckPool } from "../../rules/character";
+import { artifactTotals, maxHp, radTurnText, setLuckPool } from "../../rules/character";
 import type { AttrKey, RerollSkill } from "../../rules/types";
 import { clamp, cx, num, uid } from "../../util";
 import { Area, Box, Btn, Clover, Confirm, Dots, EditNum, KV, Lab, Meter, Stepper, Steps, Text, Trefoil } from "../bits";
@@ -24,6 +24,7 @@ function Vitals(api: SheetApi) {
   const spr = d.eff.spr, move = 3 + spr, crawl = Math.ceil(move / 2);
   const rad = (delta: number) => up(x => { x.rad = clamp(x.rad + delta, 0, 1000); });
   const pool = num(c.luck.pool), cur = num(c.luck.cur);
+  const radTurn = artifactTotals(c).radTurn;
   return (
     <div className="stack">
       <HealthBox {...api} />
@@ -51,6 +52,7 @@ function Vitals(api: SheetApi) {
             </div>
             <Meter value={c.rad} max={1000} cls="rad" marks={[100, 300, 500, 800]} showMax label={`Радіація ${c.rad} з 1000`} />
             {d.radStage > 0 && <div className="neg">{RAD_STAGE[d.radStage]} стадія: {RAD_FX[d.radStage]}.</div>}
+            {radTurn !== 0 && <div className={radTurn > 0 ? "amber" : "hint"}>{radTurnText(radTurn)}</div>}
           </div>
         </Box>
       )}

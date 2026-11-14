@@ -1,5 +1,5 @@
 // The GM's rules as data. Source: the rules document of the campaign.
-import type { AttrKey, ItemEffect, ModKind, SkillKey } from "./types";
+import type { ArtFx, ArtFxKey, ArtRarity, ArtType, AttrKey, ItemEffect, ModKind, SkillKey } from "./types";
 
 export const ATTR_PTS = 16;
 export const SKILL_PTS = 18;
@@ -52,7 +52,7 @@ export const MARKET: MarketEntry[] = [
   { g: "Їжа й вода", n: "Хліб", w: 0.5, p: 40, d: "пів раціону" },
   { g: "Їжа й вода", n: "Ковбаса", w: 0.3, p: 40, d: "пів раціону" },
   { g: "Їжа й вода", n: "Сніданок туриста", w: 0.5, p: 100, d: "повний раціон" },
-  { g: "Їжа й вода", n: "MRE", w: 1, p: 1000, uses: 5, d: "повний раціон, 5 порцій" },
+  { g: "Їжа й вода", n: "MRE", w: 1, p: 500, uses: 5, d: "повний раціон, 5 порцій" },
   { g: "Спорядження", n: "Спальник", w: 1, p: 200, d: "" },
   { g: "Спорядження", n: "Протигаз", w: 0.5, p: 500, d: "фільтр міняти кожні 2 години" },
   { g: "Спорядження", n: "Фільтр до протигаза", w: 0, p: 50, d: "на 2 години" },
@@ -209,3 +209,67 @@ export const CUSTOM_GUN: GunEntry = { n: "Нова зброя", g: "", skill: "r
 
 export const WEAPON_SKILLS: SkillKey[] = ["rifles", "pistols", "heavy", "melee", "unarmed"];
 export const REROLL_OPTIONS: [string, string][] = [["", "немає"], ["rifles", "гвинтівки"], ["pistols", "пістолети"], ["heavy", "важка зброя"], ["any", "будь-яка зброя"]];
+
+/* ---------- artefacts ---------- */
+export const ART_TYPES: [ArtType, string][] = [["grav", "Гравітаційний"], ["therm", "Термічний"], ["elec", "Електричний"], ["chem", "Хімічний"], ["unique", "Унікальний"]];
+export const ART_RARITY: [ArtRarity, string][] = [["common", "Поширений"], ["rare", "Рідкісний"], ["unique", "Унікальний"]];
+/** What an artefact may change, in the order the GM's form offers it. `good` is the sign that helps the wearer. */
+export const ART_FX_INFO: { key: ArtFxKey; name: string; short: string; good: 1 | -1 }[] = [
+  { key: "spr", name: "Спритність", short: "Спритність", good: 1 },
+  { key: "til", name: "Тілобудова", short: "Тілобудова", good: 1 },
+  { key: "spy", name: "Сприйняття", short: "Сприйняття", good: 1 },
+  { key: "rea", name: "Реакція", short: "Реакція", good: 1 },
+  { key: "mud", name: "Мудрість", short: "Мудрість", good: 1 },
+  { key: "kin", name: "Кінетична броня", short: "кінетична броня", good: 1 },
+  { key: "acid", name: "Захист від кислоти", short: "захист від кислоти", good: 1 },
+  { key: "fire", name: "Захист від вогню", short: "захист від вогню", good: 1 },
+  { key: "elec", name: "Захист від електрики", short: "захист від електрики", good: 1 },
+  { key: "rad", name: "Захист від радіації", short: "захист від радіації", good: 1 },
+  { key: "radTurn", name: "Радіація на початку ходу (+ накопичує, − виводить)", short: "рад за хід", good: -1 },
+];
+
+export interface ArtifactEntry {
+  n: string; type: ArtType; rarity: ArtRarity;
+  /** what it looks like and where it is found */
+  d: string;
+  /** effects the sheet does not count, in words */
+  note: string;
+  fx: ArtFx;
+  p: number;
+  /** properties hidden from players until the GM unticks it */
+  secret: boolean;
+}
+const art = (n: string, type: ArtType, rarity: ArtRarity, fx: ArtFx, d: string, note = ""): ArtifactEntry => ({ n, type, rarity, d, note, fx, p: 0, secret: true });
+const LONGER = "Рана кровить удвічі довше.";
+/**
+ * The artefacts of the GM's document of 2026-11-14, by its headings. Rarity follows the document's anomaly lists:
+ * (1) common, (2) rare, (3) unique. The document gives no prices. Descriptions are short retellings.
+ */
+export const ARTIFACTS: ArtifactEntry[] = [
+  art("Слиз", "chem", "common", { fire: -4, acid: -4 }, "Із «Холодцю». Згущує кров, але тіло гірше тримає опіки.", "Кровотеча на 3 раунди коротша."),
+  art("Слимак", "chem", "common", { fire: -4, acid: -4 }, "Із «Холодцю». Сильніше згортає кров.", "Кровотеча на 5 раундів коротша."),
+  art("Слюда", "chem", "rare", { fire: -8, acid: -8 }, "Напівпрозорий твердий артефакт із «Холодцю», рідкісний і дорогий.", "Кровотеча на 7 раундів коротша."),
+  art("Плівка", "chem", "unique", { acid: 8 }, "Дуже рідкісна. Відштовхує їдкі речовини."),
+  art("Колючка", "chem", "common", { radTurn: -5 }, "Із «Жалкого пуху». Шипи ятрять тіло, зате виводять радіацію.", LONGER),
+  art("Кристальна колючка", "chem", "rare", { radTurn: -10 }, "Кристалізується в «Жалкому пуху». Виводить радіацію разом із кров'ю.", LONGER),
+  art("Морський їжак", "chem", "unique", { radTurn: -15 }, "Рідко трапляється в «Жалкому пуху». Піднімає тиск і виводить радіацію.", LONGER),
+  art("Медуза", "grav", "common", { kin: 1, radTurn: 5 }, "Із «Трампліна». Слабке захисне поле, що трохи фонить."),
+  art("Кам'яна квітка", "grav", "common", { kin: 2, radTurn: 5 }, "Із «Трампліна». Металеві вкраплення красиво грають на світлі."),
+  art("Нічна зірка", "grav", "rare", { kin: 4, radTurn: 15 }, "Із «Трампліна». Надзвичайно рідкісна й дорога, сильно фонить."),
+  art("Мамине намисто", "grav", "unique", { kin: 4 }, "Самі лише добрі властивості. Вчені платять за нього великі гроші."),
+  art("Граві", "grav", "common", { radTurn: 5 }, "Утворюється, коли гравітація довго діє на металеві предмети.", "Чи кровить рана: кидок 2к10 замість 1к10."),
+  art("Виверт", "grav", "common", { radTurn: -10 }, "Химерна губка з місць сильної гравітації. Вбирає радіацію."),
+  art("Золота рибка", "grav", "common", { radTurn: 5 }, "Із «Воронки», оживає від тепла тіла.", "Чи кровить рана: кидок 3к10 замість 1к10."),
+  art("Колобок", "grav", "rare", {}, "Шкіра під ним грубішає: кулю не зупинить, але різати важче.", "Чи кровить рана: кидок 5к10 замість 1к10."),
+  art("Кров каменю", "grav", "common", { kin: -2 }, "Біля «Каруселі». Червонувате спресоване утворення з рослин, ґрунту й кісток.", "Рани й здоров'я відновлюються вдвічі швидше."),
+  art("Шмат м'яса", "grav", "common", { kin: -2 }, "Із «Каруселі». Пришвидшує поділ клітин, але молоді тканини вразливіші.", "Рани й здоров'я відновлюються втричі швидше."),
+  art("Душа", "grav", "rare", { kin: -3 }, "Дуже рідко біля «Каруселі». Мало хто її бачив.", "Рани й здоров'я відновлюються вчетверо швидше."),
+  art("Бенгальський вогонь", "elec", "common", { spr: 1, elec: -4 }, "Біля «Електри». Недорогий, але дослідники його цінують."),
+  art("Спалах", "elec", "rare", { spr: 2, elec: -6 }, "Зрідка з «Електри». Сталкери його люблять."),
+  art("Місячне сяйво", "elec", "unique", { spr: 3, elec: -8 }, "Округлий, рідкісний випадок активності «Електри»."),
+  art("Батарейка", "elec", "unique", { spr: 3 }, "Містить діелектрики. Як утворюється, науці невідомо."),
+  art("Краплі", "therm", "common", { radTurn: -5, spr: -1 }, "Із «Жарки»: почорніла крапля з тріснутою глянцевою поверхнею."),
+  art("Вогняна куля", "therm", "common", { radTurn: -10, spr: -1 }, "Кристалізується в «Жарці». Теплий, виводить радіацію, але виснажує м'язи."),
+  art("Кристал", "therm", "rare", { radTurn: -15, spr: -2 }, "Важкий метал, що потрапив у «Жарку». Цінується, добути важко."),
+  art("Полум'я", "therm", "unique", { fire: 8 }, "Рідкісне. Тримає 37 °C на два метри навколо."),
+];
