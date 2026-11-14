@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GUNS, MARKET } from "./data";
-import { SHOT0, addMarketItem, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newDraft, reload, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem } from "./character";
+import { SHOT0, addMarketItem, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newDraft, reload, resolveShot, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem, weaponModes, weightParts } from "./character";
 import { decode, encode } from "./codes";
 import type { Character } from "./types";
 
@@ -75,6 +75,15 @@ describe("conditions", () => {
     expect(d.state).toBe("out");
   });
 
+  it("the load counts weapons too, and says so", () => {
+    const c = simka();
+    c.weapons.push({ id: "g", name: "СВД", skill: "rifles", dmg: "2к10", mag: 10, cur: 10, modes: "напівавтомат", w: 4.3, cal: "7.62×54", nato: false, jams: 0, note: "" });
+    c.items.push({ id: "a", name: "Бинт", qty: 2, w: 0.1, note: "" });
+    expect(weightParts(c)).toEqual({ items: 0.2, weapons: 4.3, armor: 0 });
+    c.armor.countW = true;
+    expect(weightParts(c).armor).toBe(3);
+  });
+
   it("carrying more than Тілобудова × 10 kg halves Спритність", () => {
     const c = simka();
     c.items.push({ id: "a", name: "Вантаж", qty: 31, w: 1, note: "" });
@@ -95,6 +104,26 @@ describe("shooting", () => {
     expect(s.chance).toBeCloseTo(0.7);
     expect(s.reroll).toBe(true);
     expect(s.chanceReroll).toBeCloseTo(0.97);
+  });
+
+  it("several shots in one action follow the rules: burst −1 after the first, automatic −1 more each time", () => {
+    const c = simka(), d = derive(c);
+    expect(shotCalc(c, d, { ...SHOT0, mode: "semi" }).shots.map(s => s.need)).toEqual([4, 4]);
+    expect(shotCalc(c, d, { ...SHOT0, mode: "burst" }).shots.map(s => s.need)).toEqual([4, 5, 5]);
+    expect(shotCalc(c, d, { ...SHOT0, mode: "auto" }).shots.map(s => s.need)).toEqual([4, 5, 6, 7, 8]);
+  });
+
+  it("a picked weapon sets the skill, NATO bonus, jams and the fire modes it has", () => {
+    const c = simka();
+    c.weapons.push({ id: "mp5", name: "MP-5", skill: "rifles", dmg: "к10+1", mag: 30, cur: 30, modes: "напівавтомат, автомат, по 3", w: 2.5, cal: "9×19", nato: true, jams: 1, note: "" });
+    c.weapons.push({ id: "pm", name: "ПМ", skill: "pistols", dmg: "к10", mag: 8, cur: 8, modes: "напівавтомат", w: 0.5, cal: "9×18", nato: false, jams: 0, note: "" });
+    const mp5 = resolveShot(c, { ...SHOT0, weapon: "mp5", mode: "auto" });
+    expect(mp5).toMatchObject({ skill: "rifles", nato: true, jam: 1, mode: "auto" });
+    expect(resolveShot(c, { ...SHOT0, weapon: "pm", mode: "auto" })).toMatchObject({ skill: "pistols", nato: false, mode: "single" });
+    expect(resolveShot(c, { ...SHOT0, weapon: "gone" }).weapon).toBe("");
+    expect(weaponModes("напівавтомат, автомат, по 3")).toEqual(["single", "semi", "burst", "auto"]);
+    expect(weaponModes("одиночний")).toEqual(["single"]);
+    expect(weaponModes("")).toEqual(["single", "semi", "burst", "auto"]);
   });
 
   it("modifiers add up and the reroll only applies to its weapon", () => {

@@ -46,6 +46,10 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 - Tabs and what they are for: **Картка** is the general view, open most of the time; **Бій** is for combat; **Рюкзак** is for items; **Нотатки** holds notes and every rules reminder.
 - On Картка: no "Особова справа" box (name and role sit in the header, looks and backstory move to Нотатки) and no "Кидки й рух" box (only the movement speed stays).
 - Style: «Бланк», the dark olive field form (variant А of the mockups at https://claude.ai/artifact/Sfd3NzpT8i5HjGEVK8YSpK), chosen 2026-11-14 with these changes: only the callsign in the header (no role); skill levels as dots, not squares; the health number and bar change colour at each wound threshold (green, yellow, orange, red); the condition is called «Алкоголь», not «Горілка», because beer and the rest exist too.
+- No virtual dice: everyone rolls at the table. The shot calculator only says what the die must show (owner, 2026-11-14).
+- Nothing may appear, disappear or change height when a number changes: reserve the space (show a control disabled, hide text with `visibility`). Height may change only when the person adds or opens something.
+- Health is changed by any amount on every tab: a field (empty means 1) with − and +. In combat − goes through the chosen armour.
+- Multi-shot fire follows the rules document: semi-automatic 2 shots without penalty, burst of three −1 on the 2nd and 3rd, automatic −1, −2, −3, −4 on shots 2–5. The owner remembered "−1 more for every shot" for all multi-shot weapons; if the GM confirms that, change `FIRE_MODES` in `rules/character.ts`.
 - Done in that pass: luck (pool typed in the wizard, may stay 0; spend 1/3/5; +2 at dawn, +3 in safety, never above the pool; +1 per point and luck rerolls in the shot calculator).
 
 ## Roadmap (agreed with the owner, in this order)

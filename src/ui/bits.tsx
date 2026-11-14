@@ -64,8 +64,8 @@ export function NumIn({ value, set, min = 0, className, label, placeholder }: { 
 export function Lab({ name, wide, children }: { name: string; wide?: boolean; children: ReactNode }) {
   return <label className={cx("fl", wide && "wide")}><span>{name}</span>{children}</label>;
 }
-export function Check({ checked, set, children, wide }: { checked: boolean; set: (v: boolean) => void; children: ReactNode; wide?: boolean }) {
-  return <label className={cx("chk", wide && "wide")}><input type="checkbox" checked={checked} onChange={e => set(e.target.checked)} /> {children}</label>;
+export function Check({ checked, set, children, wide, disabled }: { checked: boolean; set: (v: boolean) => void; children: ReactNode; wide?: boolean; disabled?: boolean }) {
+  return <label className={cx("chk", wide && "wide", disabled && "off")}><input type="checkbox" checked={checked} disabled={disabled} onChange={e => set(e.target.checked)} /> {children}</label>;
 }
 /** a chip that is either on or off */
 export function Tg({ on, onClick, mod, children, disabled }: { on: boolean; onClick: () => void; mod?: string; children: ReactNode; disabled?: boolean }) {

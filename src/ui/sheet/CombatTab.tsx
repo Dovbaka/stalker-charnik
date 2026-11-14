@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { GUNS, SKILL_NAME, WEAPON_SKILLS } from "../../rules/data";
-import { LUCK_COST, SHOT0, addGun, reload, shotCalc, spendLuck, type ShotOpts } from "../../rules/character";
+import { FIRE_MODES, SHOT0, addGun, rangedWeapons, reload, resolveShot, shotCalc, weaponModes, type ShotOpts } from "../../rules/character";
 import type { SkillKey } from "../../rules/types";
-import { clamp, d10, num, sign } from "../../util";
+import { clamp, cx, num, sign } from "../../util";
 import { Box, Btn, Check, Confirm, KV, Lab, NumIn, Stepper, Text, Tg, toast, usePersisted } from "../bits";
 import type { SheetApi } from "../Sheet";
 import { HealthBox, LuckControls } from "./parts";
@@ -17,92 +17,91 @@ export function CombatTab(api: SheetApi) {
   </>;
 }
 
-interface Attempt { how: string; r: number; mod: number; hit: boolean }
+function Group({ name, children }: { name: string; children: ReactNode }) {
+  return <div className="cgroup"><div className="lbl">{name}</div>{children}</div>;
+}
 
-/** The shot calculator works on anyone's sheet; luck can only be spent on your own. */
+const needText = (n: number) => (n <= 1 ? "1+" : n > 10 ? "—" : n + "+");
+const pc = (v: number) => Math.round(v * 100) + "%";
+
+/**
+ * What the die has to show, worked out from the weapon and the situation. The dice are rolled at the table:
+ * this box only adds up the modifiers. Works on anyone's sheet.
+ */
 function ShotBox({ c, d, ro, up }: SheetApi) {
-  const [o, setO] = usePersisted<ShotOpts>("charnik.shot", SHOT0);
-  const [log, setLog] = useState<Attempt[]>([]);
-  const [eyeUsed, setEyeUsed] = useState(false);
-  const set = (patch: Partial<ShotOpts>) => { setO({ ...o, ...patch }); setLog([]); };
+  const [saved, setO] = usePersisted<ShotOpts>("charnik.shot", SHOT0);
+  const o = resolveShot(c, saved);
+  const set = (patch: Partial<ShotOpts>) => setO({ ...saved, ...patch });
   const m = shotCalc(c, d, o);
-  const luck = num(c.luck.cur);
-  const pc = (v: number) => Math.round(v * 100) + "%";
-  const need = m.need <= 1 ? "1+" : m.need > 10 ? "—" : m.need + "+";
-  const flag = (key: "sit" | "optic" | "colim" | "nato" | "lying" | "tprone" | "vis" | "invis", text: string, mod: string) =>
-    <Tg on={o[key]} mod={mod} onClick={() => set({ [key]: !o[key] } as Partial<ShotOpts>)}>{text}</Tg>;
-  const bump = (key: "rounds" | "jam" | "extra", lo: number, hi: number) =>
-    <Stepper value={o[key]} min={lo} max={hi} show={o[key] > 0 ? "+" + o[key] : o[key]} set={v => set({ [key]: v } as Partial<ShotOpts>)} />;
-
-  const spend = (n: number): boolean => {
-    if (ro) return false;
-    let ok = true;
-    up(x => { for (let i = 0; i < n && ok; i++) ok = spendLuck(x, "bonus"); });
-    return ok;
-  };
-  const throwDie = () => {
-    if (o.luck > 0) {
-      if (ro || luck < o.luck) { toast("Удачі не вистачає."); return; }
-      spend(o.luck);
-      setO({ ...o, luck: 0 }); // spent: the next shot starts without it
-    }
-    const r = d10();
-    setLog([{ how: "Кидок", r, mod: m.mod, hit: r + m.mod >= 9 }]);
-    setEyeUsed(false);
-  };
-  const first = log[0];
-  const missed = log.length > 0 && !log.some(a => a.hit);
-  const eye = () => { const r = d10(), mod = first.mod + m.rerollBonus; setLog([...log, { how: `Перекид +${m.rerollBonus}`, r, mod, hit: r + mod >= 9 }]); setEyeUsed(true); };
-  const luckReroll = () => {
-    let ok = false; up(x => { ok = spendLuck(x, "reroll"); });
-    if (!ok) return;
-    const r = d10(); setLog([...log, { how: "Перекид за удачу", r, mod: first.mod, hit: r + first.mod >= 9 }]);
-  };
-  const luckAuto = () => {
-    let ok = false; up(x => { ok = spendLuck(x, "auto"); });
-    if (ok) setLog([...log, { how: "Автоуспіх за удачу", r: 0, mod: 0, hit: true }]);
-  };
+  const guns = rangedWeapons(c);
+  const gun = guns.find(g => g.id === o.weapon);
+  const modes = gun ? weaponModes(gun.modes) : FIRE_MODES.map(f => f.key);
+  const flag = (key: "sit" | "optic" | "colim" | "nato" | "lying" | "tprone" | "vis" | "invis", text: string, mod: string, disabled = false) =>
+    <Tg on={o[key] && !disabled} mod={mod} disabled={disabled} onClick={() => set({ [key]: !saved[key] } as Partial<ShotOpts>)}>{text}</Tg>;
 
   return (
-    <Box title="Постріл">
+    <Box title="Постріл" right={<Btn sm onClick={() => setO({ ...SHOT0, weapon: saved.weapon })}>Скинути</Btn>}>
       <div className="pad">
-        <div className="seg">{(["rifles", "pistols", "heavy"] as const).map(k => <Tg key={k} on={o.skill === k} mod={String(num(c.skills[k]))} onClick={() => set({ skill: k })}>{SKILL_NAME[k]}</Tg>)}</div>
-        <div className="seg"><Tg on={o.shot === "aimed"} onClick={() => set({ shot: "aimed" })}>Прицільний</Tg><Tg on={o.shot === "quick"} mod="−1" onClick={() => set({ shot: "quick" })}>Швидкий</Tg></div>
-        <div className="seg"><Tg on={o.near === "far"} onClick={() => set({ near: "far" })}>Далі 10 м</Tg><Tg on={o.near === "10"} mod="+1" onClick={() => set({ near: "10" })}>До 10 м</Tg><Tg on={o.near === "1"} mod="+3" onClick={() => set({ near: "1" })}>До 1 м</Tg></div>
-        <div className="seg"><Tg on={o.cover === "0"} onClick={() => set({ cover: "0" })}>Без укриття</Tg><Tg on={o.cover === "1"} mod="−1" onClick={() => set({ cover: "1" })}>Укриття ½</Tg><Tg on={o.cover === "3"} mod="−3" onClick={() => set({ cover: "3" })}>Укриття ¾</Tg></div>
-        <div className="seg">
-          {o.shot === "aimed" && flag("sit", "Сидячи", "+1")}
-          {flag("optic", "Оптика, від 50 м", "+1")}{flag("colim", "Коліматор, до 50 м", "+1")}{flag("nato", "Зброя НАТО", "+1")}
-          {flag("lying", "Лежачи", "−2")}{flag("tprone", "Ціль лежить", "−1")}{flag("vis", "Туман, дощ", "−2")}{flag("invis", "Ціль невидима", "−3")}
-          <Tg on={c.armor.mask} mod="−1" disabled={ro} onClick={() => { up(x => { x.armor.mask = !x.armor.mask; }); setLog([]); }}>Протигаз</Tg>
+        <div className="calcres" aria-live="polite">
+          {m.shots.map((s, i) => (
+            <div className="shot" key={i}>
+              {m.shots.length > 1 && <span className="k">{i + 1}-й</span>}
+              <span className="n">{needText(s.need)}</span>
+              <span className="p">{s.need > 10 ? "не влучити" : pc(s.chance)}</span>
+            </div>
+          ))}
         </div>
-        <KV k="Раунди по цій цілі">{bump("rounds", 0, 9)}</KV>
-        <KV k="Зброя клинила">{bump("jam", 0, 2)}</KV>
-        <KV k="Інше">{bump("extra", -9, 9)}</KV>
-        {!ro && num(c.luck.pool) > 0 && <KV k={`Удача, +1 за очко (є ${luck})`}><Stepper value={o.luck} min={0} max={Math.min(5, luck)} show={o.luck > 0 ? "+" + o.luck : 0} set={v => set({ luck: v })} /></KV>}
-        <div className="result">
-          <div className="need">{need}</div>
-          <div>
-            {m.need <= 1 ? "Влучає завжди." : m.need > 10 ? "Таким кидком не влучити." : <>на к10 · <b>{pc(m.chance)}</b></>}
-            {m.reroll && m.need > 1 && <><br />з перекидом +{m.rerollBonus}: <b>{pc(m.chanceReroll)}</b></>}
+        {m.reroll && m.need > 1 && m.need <= 10 && <div className="hint">З перекидом +{m.rerollBonus}: {pc(m.chanceReroll)}</div>}
+
+        <Group name="Зброя">
+          <div className="seg">
+            {guns.length > 0
+              ? guns.map(g => <Tg key={g.id} on={o.weapon === g.id} mod={String(num(c.skills[g.skill]))} onClick={() => set({ weapon: o.weapon === g.id ? "" : g.id })}>{g.name}</Tg>)
+              : (["rifles", "pistols", "heavy"] as const).map(k => <Tg key={k} on={o.skill === k} mod={String(num(c.skills[k]))} onClick={() => set({ skill: k })}>{SKILL_NAME[k]}</Tg>)}
           </div>
-        </div>
-        <div className="formula">к10 {m.parts.map(x => `${sign(x[1])} ${x[0]}`).join(" ")}</div>
-        <div className="row wrapg"><Btn pri onClick={throwDie}>Кинути к10</Btn><Btn onClick={() => { setO(SHOT0); setLog([]); }}>Скинути</Btn></div>
-        {log.length > 0 && (
-          <div className="rolllog">
-            {log.map((a, i) => (
-              <div key={i}>{a.how}{a.r ? `: ${a.r} ${sign(a.mod)} = ${a.r + a.mod}` : ""}. {a.hit ? <b className="pos">Влучання.</b> : <b className="neg">Промах.</b>}</div>
-            ))}
-            {missed && (
-              <div className="row wrapg">
-                {m.reroll && !eyeUsed && <Btn sm pri onClick={eye}>Перекид +{m.rerollBonus}</Btn>}
-                {!ro && luck >= LUCK_COST.reroll && <Btn sm onClick={luckReroll}>Перекид за удачу<span className="cost">3</span></Btn>}
-                {!ro && luck >= LUCK_COST.auto && <Btn sm onClick={luckAuto}>Влучити за удачу<span className="cost">5</span></Btn>}
-              </div>
-            )}
+          {guns.length > 0 && !gun && (
+            <div className="seg">{(["rifles", "pistols", "heavy"] as const).map(k => <Tg key={k} on={o.skill === k} mod={String(num(c.skills[k]))} onClick={() => set({ skill: k })}>{SKILL_NAME[k]}</Tg>)}</div>
+          )}
+        </Group>
+
+        <Group name="Постріл">
+          <div className="seg">
+            <Tg on={o.shot === "aimed"} onClick={() => set({ shot: "aimed" })}>Прицільний</Tg>
+            <Tg on={o.shot === "quick"} mod="−1" onClick={() => set({ shot: "quick" })}>Швидкий</Tg>
+            {flag("sit", "Сидячи", "+1", o.shot !== "aimed")}
           </div>
-        )}
+          <div className="seg">
+            {FIRE_MODES.map(f => <Tg key={f.key} on={o.mode === f.key} disabled={!modes.includes(f.key)} mod={f.pens.length > 1 ? String(f.pens.length) : undefined} onClick={() => set({ mode: f.key })}>{f.name}</Tg>)}
+          </div>
+        </Group>
+
+        <Group name="Ціль">
+          <div className="seg">
+            <Tg on={o.near === "far"} onClick={() => set({ near: "far" })}>Далі 10 м</Tg>
+            <Tg on={o.near === "10"} mod="+1" onClick={() => set({ near: "10" })}>До 10 м</Tg>
+            <Tg on={o.near === "1"} mod="+3" onClick={() => set({ near: "1" })}>До 1 м</Tg>
+          </div>
+          <div className="seg">
+            <Tg on={o.cover === "0"} onClick={() => set({ cover: "0" })}>Відкрита</Tg>
+            <Tg on={o.cover === "1"} mod="−1" onClick={() => set({ cover: "1" })}>Укриття ½</Tg>
+            <Tg on={o.cover === "3"} mod="−3" onClick={() => set({ cover: "3" })}>Укриття ¾</Tg>
+          </div>
+          <div className="seg">{flag("tprone", "Лежить", "−1")}{flag("invis", "Невидима", "−3")}</div>
+        </Group>
+
+        <Group name="Умови">
+          <div className="seg">
+            {flag("optic", "Оптика, від 50 м", "+1")}{flag("colim", "Коліматор, до 50 м", "+1")}
+            {flag("lying", "Стріляю лежачи", "−2")}{flag("vis", "Туман, дощ", "−2")}
+            <Tg on={c.armor.mask} mod="−1" disabled={ro} onClick={() => up(x => { x.armor.mask = !x.armor.mask; })}>Протигаз</Tg>
+            {!gun && flag("nato", "Зброя НАТО", "+1")}
+          </div>
+          <KV k="Раунди по цій цілі"><Stepper value={o.rounds} min={0} max={9} show={o.rounds > 0 ? "+" + o.rounds : 0} set={v => set({ rounds: v })} /></KV>
+          {!gun && <KV k="Зброя клинила"><Stepper value={o.jam} min={0} max={2} show={o.jam > 0 ? "−" + o.jam : 0} set={v => set({ jam: v })} /></KV>}
+          <KV k="Інше"><Stepper value={o.extra} min={-9} max={9} show={o.extra > 0 ? "+" + o.extra : o.extra} set={v => set({ extra: v })} /></KV>
+        </Group>
+
+        <div className="formula">к10 {m.parts.map(x => `${sign(x[1])} ${x[0]}`).join(" ")}, влучає на 9+</div>
       </div>
     </Box>
   );
@@ -142,7 +141,7 @@ function GunsBox({ c, ro, edit, up }: SheetApi) {
                   <Btn pri onClick={() => { let msg = ""; up(x => { msg = reload(x, g.id); }); if (msg) toast(msg); }}>Перезарядити</Btn>
                 </div>
                 {mag <= 40 && <div className="rounds" aria-hidden="true">{"▮".repeat(cur)}{"▯".repeat(mag - cur)}</div>}
-                <KV k={jams >= 3 ? <span className="neg">Непридатна до ремонту</span> : jams > 0 ? <span className="neg">Клинила: −{jams} до влучання й шкоди</span> : <span className="hint">Клинила</span>}>
+                <KV k={<span className={cx(jams > 0 ? "neg" : "hint")}>{jams >= 3 ? "Клинила: непридатна" : jams > 0 ? `Клинила: −${jams}` : "Клинила"}</span>}>
                   <Stepper value={jams} min={0} max={3} set={v => up(x => { x.weapons[i].jams = v; })} />
                 </KV>
               </>}
@@ -155,7 +154,7 @@ function GunsBox({ c, ro, edit, up }: SheetApi) {
                   <Lab name="Магазин"><NumIn value={mag} set={v => up(x => { x.weapons[i].mag = v; x.weapons[i].cur = Math.min(x.weapons[i].cur, v); })} /></Lab>
                   <Lab name="Вага, кг"><NumIn value={num(g.w)} set={v => up(x => { x.weapons[i].w = v; })} /></Lab>
                   <Lab name="Калібр"><Text value={g.cal} set={v => up(x => { x.weapons[i].cal = v; })} /></Lab>
-                  <Lab name="Режими вогню"><Text value={g.modes} set={v => up(x => { x.weapons[i].modes = v; })} /></Lab>
+                  <Lab name="Режими вогню"><Text value={g.modes} placeholder="напівавтомат, автомат, по 3" set={v => up(x => { x.weapons[i].modes = v; })} /></Lab>
                   <Lab name="Нотатка" wide><Text value={g.note} set={v => up(x => { x.weapons[i].note = v; })} /></Lab>
                   <Check wide checked={g.nato} set={v => up(x => { x.weapons[i].nato = v; })}>Зброя НАТО, +1 до влучання</Check>
                 </div>

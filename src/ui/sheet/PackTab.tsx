@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { MARKET, marketName } from "../../rules/data";
-import { addMarketItem, useCharge, useItem } from "../../rules/character";
+import { addMarketItem, useCharge, useItem, weightParts } from "../../rules/character";
 import { cx, fmt, kg, num, uid } from "../../util";
 import { Box, Btn, Check, Confirm, Lab, Meter, NumIn, Stepper, Text, toast } from "../bits";
 import type { SheetApi } from "../Sheet";
@@ -20,6 +20,8 @@ function MoneyBox({ c, d, ro, up }: SheetApi) {
     setAmt("");
   };
   const limit = d.cap * 1.5;
+  const parts = weightParts(c);
+  const made = [["зброя", parts.weapons], ["речі", parts.items], ["броня", parts.armor]].filter(([, w]) => (w as number) > 0).map(([n, w]) => `${n} ${kg(w as number)}`).join(" · ");
   return (
     <div className="stack">
       <Box title="Купони" ro={ro}>
@@ -33,7 +35,7 @@ function MoneyBox({ c, d, ro, up }: SheetApi) {
       </Box>
       <Box title="Вантаж" ro={ro} right={d.over ? <span className={d.over === 2 ? "neg" : "amber"}>{d.over === 2 ? "Понад межу" : "Спритність ÷2"}</span> : undefined}>
         <div className="pad">
-          <div className="big">{kg(d.weight)}<small> / {d.cap} кг</small></div>
+          <div className="row between base wrapg"><span className="big">{kg(d.weight)}<small> / {d.cap} кг</small></span><span className="hint num">{made || "нічого"}</span></div>
           <Meter value={d.weight} max={limit} cls={cx("load", d.over === 1 && "over", d.over === 2 && "limit")} marks={[d.cap]} label={`Вантаж ${kg(d.weight)} кг: без штрафу до ${d.cap}, межа ${kg(limit)}`} />
         </div>
       </Box>
@@ -71,10 +73,10 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
             <div className={cx("irow", !q && "zero")} key={it.id}>
               <div className="nm">
                 <b>{it.name}</b>
-                {it.uses != null && q > 0 && <span className="hint">у початому: {num(it.uses)}</span>}
+                {it.uses != null && <span className="hint">у початому: {q > 0 ? num(it.uses) : 0}</span>}
               </div>
-              {it.fx && q > 0 && <Btn sm pri onClick={() => { let msg = ""; up(x => { msg = useItem(x, it.id); }); if (msg) toast(msg); }}>Вжити</Btn>}
-              {it.uses != null && !it.fx && q > 0 && <Btn sm onClick={() => up(x => useCharge(x.items[i]))}>Використати</Btn>}
+              {it.fx && <Btn sm pri disabled={q <= 0} onClick={() => { let msg = ""; up(x => { msg = useItem(x, it.id); }); if (msg) toast(msg); }}>Вжити</Btn>}
+              {it.uses != null && !it.fx && <Btn sm disabled={q <= 0} onClick={() => up(x => useCharge(x.items[i]))}>Використати</Btn>}
               <Stepper value={q} min={0} max={9999} set={v => up(x => { x.items[i].qty = v; })} />
               <span className="iw num">{kg(q * num(it.w))} кг</span>
               {edit && (

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ATTRS, ATTR_ABBR, ATTR_KEYS, RAD_FX, RAD_STAGE, REROLL_OPTIONS, SKILL_GROUPS, SKILL_KEYS } from "../../rules/data";
+import { ATTRS, RAD_FX, RAD_STAGE, REROLL_OPTIONS, SKILL_GROUPS, SKILL_KEYS } from "../../rules/data";
 import { maxHp } from "../../rules/character";
 import type { AttrKey, RerollSkill } from "../../rules/types";
 import { clamp, cx, num, uid } from "../../util";
@@ -52,39 +52,26 @@ function Vitals(api: SheetApi) {
   );
 }
 
-/** "радіація: Тіло −1, Сприт −1" for every source that changes an attribute right now. */
-function modifierLines(d: SheetApi["d"]): string[] {
-  const bySource = new Map<string, string[]>();
-  for (const k of ATTR_KEYS) {
-    for (const [src, v] of d.lines[k]) {
-      if (!bySource.has(src)) bySource.set(src, []);
-      bySource.get(src)!.push(`${ATTR_ABBR[k]} ${v > 0 ? "+" : "−"}${Math.abs(v)}`);
-    }
-    for (const src of d.halves[k]) {
-      if (!bySource.has(src)) bySource.set(src, []);
-      bySource.get(src)!.push(`${ATTR_ABBR[k]} ÷2`);
-    }
-  }
-  return [...bySource].map(([src, parts]) => `${src}: ${parts.length === ATTR_KEYS.length && new Set(parts.map(p => p.split(" ")[1])).size === 1 ? "усі " + parts[0].split(" ")[1] : parts.join(", ")}`);
+/** Why an attribute is not its base value, for the tile's tooltip: "радіація −1, рани ÷2". */
+function reasons(d: SheetApi["d"], k: AttrKey): string {
+  return [...d.lines[k].map(([src, v]) => `${src} ${v > 0 ? "+" : "−"}${Math.abs(v)}`), ...d.halves[k].map(src => `${src} ÷2`)].join(", ");
 }
 
 function AttrsBox({ c, d, ro, edit, up }: SheetApi) {
-  const mods = modifierLines(d);
   return (
     <Box title="Характеристики" ro={ro}>
       <div className="attrs">
         {ATTRS.map(a => {
           const base = num(c.attrs[a.key]), v = d.eff[a.key];
           return (
-            <div className="attr" key={a.key} title={a.name}>
+            <div className="attr" key={a.key} title={[a.name, reasons(d, a.key)].filter(Boolean).join(": ")}>
               <span className={cx("v", v < base && "neg", v > base && "pos")}>{v}</span>
               <span className="lbl">{a.abbr}</span>
-              {v !== base && <span className="was">з {base}</span>}
+              <span className="was" style={{ visibility: v !== base ? "visible" : "hidden" }}>з {base}</span>
             </div>
           );
         })}
       </div>
-      {mods.length > 0 && <div className="mods">{mods.map(m => <span key={m} className={cx("chip", m.includes("+") ? "pos" : "neg")}>{m}</span>)}</div>}
       {edit && (
         <div className="edlist">
           {ATTRS.map(a => {

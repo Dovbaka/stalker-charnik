@@ -74,12 +74,16 @@ export function takeDamage(c: Character, amount: number, type: DamageType): { re
   return { real, absorbed: Math.min(arm, amount) };
 }
 
+/** What the load is made of: the backpack, the weapons, and the armour when it is counted. */
+export function weightParts(c: Character): { items: number; weapons: number; armor: number } {
+  let items = 0, weapons = 0;
+  for (const it of c.items) items += num(it.qty) * num(it.w);
+  for (const g of c.weapons) weapons += num(g.w);
+  return { items, weapons, armor: c.armor.countW ? num(c.armor.w) : 0 };
+}
 export function totalWeight(c: Character): number {
-  let w = 0;
-  for (const it of c.items) w += num(it.qty) * num(it.w);
-  for (const g of c.weapons) w += num(g.w);
-  if (c.armor.countW) w += num(c.armor.w);
-  return w;
+  const p = weightParts(c);
+  return p.items + p.weapons + p.armor;
 }
 
 /* ---------- derived state ---------- */
@@ -173,10 +177,34 @@ export interface ShotOpts {
   cover: "0" | "1" | "3";
   tprone: boolean; vis: boolean; invis: boolean; lying: boolean;
   rounds: number; nato: boolean; jam: number; extra: number;
-  /** luck points spent for +1 each */
-  luck: number;
+  /** id of the character's weapon the shot is fired from; "" when none is picked */
+  weapon: string;
+  mode: FireMode;
 }
-export const SHOT0: ShotOpts = { skill: "rifles", shot: "aimed", sit: false, optic: false, colim: false, near: "far", cover: "0", tprone: false, vis: false, invis: false, lying: false, rounds: 0, nato: false, jam: 0, extra: 0, luck: 0 };
+export const SHOT0: ShotOpts = { skill: "rifles", shot: "aimed", sit: false, optic: false, colim: false, near: "far", cover: "0", tprone: false, vis: false, invis: false, lying: false, rounds: 0, nato: false, jam: 0, extra: 0, weapon: "", mode: "single" };
+
+/** Fire modes from the rules: how many shots one action fires and the penalty on each. */
+export type FireMode = "single" | "semi" | "burst" | "auto";
+export const FIRE_MODES: { key: FireMode; name: string; pens: number[] }[] = [
+  { key: "single", name: "Одиночний", pens: [0] },
+  { key: "semi", name: "Напівавтомат", pens: [0, 0] },
+  { key: "burst", name: "Черга з трьох", pens: [0, -1, -1] },
+  // automatic fire: −1 more for every shot after the first
+  { key: "auto", name: "Автомат", pens: [0, -1, -2, -3, -4] },
+];
+/** Which modes a weapon has, read from its free-text modes ("напівавтомат, автомат, по 3"). Unknown text allows all. */
+export function weaponModes(modes: string): FireMode[] {
+  const parts = String(modes || "").toLowerCase().split(/[,/;]+/).map(s => s.trim()).filter(Boolean);
+  const out = new Set<FireMode>(["single"]);
+  let known = false;
+  for (const p of parts) {
+    if (p.startsWith("напів")) { out.add("semi"); known = true; }
+    else if (p.startsWith("автомат")) { out.add("auto"); known = true; }
+    else if (p.includes("по 3") || p.includes("черг") || p.includes("відсіч")) { out.add("burst"); known = true; }
+    else if (p.startsWith("одиноч") || p.startsWith("одинич")) known = true;
+  }
+  return known ? FIRE_MODES.map(m => m.key).filter(k => out.has(k)) : FIRE_MODES.map(m => m.key);
+}
 
 export interface ShotCalc {
   parts: [string, number][];
@@ -189,6 +217,20 @@ export interface ShotCalc {
   chanceReroll: number;
   reroll: boolean;
   rerollBonus: number;
+  /** every shot of the chosen fire mode: what the die must show and the chance */
+  shots: { need: number; chance: number }[];
+}
+
+const SHOT_SKILLS = ["rifles", "pistols", "heavy"] as const;
+/** Ranged weapons the calculator can fire. */
+export const rangedWeapons = (c: Character) => c.weapons.filter(g => (SHOT_SKILLS as readonly string[]).includes(g.skill));
+
+/** The options as they apply: a picked weapon decides the skill, NATO bonus, jams and which fire modes exist. */
+export function resolveShot(c: Character, o: ShotOpts): ShotOpts {
+  const g = o.weapon ? rangedWeapons(c).find(x => x.id === o.weapon) : undefined;
+  if (!g) return { ...o, weapon: "" };
+  const modes = weaponModes(g.modes);
+  return { ...o, skill: g.skill as ShotOpts["skill"], nato: !!g.nato, jam: clamp(num(g.jams), 0, 2), mode: modes.includes(o.mode) ? o.mode : "single" };
 }
 export function shotCalc(c: Character, d: Derived, o: ShotOpts): ShotCalc {
   const parts: [string, number][] = [[SKILL_NAME[o.skill], num(c.skills[o.skill])]];
@@ -210,14 +252,15 @@ export function shotCalc(c: Character, d: Derived, o: ShotOpts): ShotCalc {
   if (o.nato) P("зброя НАТО", 1);
   if (o.jam) P("заклинювання", -o.jam);
   if (o.extra) P("інше", o.extra);
-  if (o.luck) P("удача", o.luck);
   if (d.checkPen) P("рани", d.checkPen);
   const mod = parts.reduce((s, x) => s + x[1], 0);
   const rb = num(c.reroll?.bonus), rs = c.reroll?.skill ?? "";
   const reroll = !!rs && rb > 0 && (rs === "any" || rs === o.skill);
   const chance = clamp((mod + 2) / 10, 0, 1);
   const chanceReroll = reroll ? chance + (1 - chance) * clamp((mod + 2 + rb) / 10, 0, 1) : chance;
-  return { parts, mod, need: 9 - mod, chance, chanceReroll, reroll, rerollBonus: rb };
+  const pens = (FIRE_MODES.find(m => m.key === o.mode) ?? FIRE_MODES[0]).pens;
+  const shots = pens.map(p => ({ need: 9 - mod - p, chance: clamp((mod + p + 2) / 10, 0, 1) }));
+  return { parts, mod, need: 9 - mod, chance, chanceReroll, reroll, rerollBonus: rb, shots };
 }
 
 /* ---------- gear ---------- */

@@ -133,7 +133,11 @@ textarea.in { display: block; resize: vertical; line-height: 1.45; }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* ---------- health ---------- */
-.hprow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hprow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.hpctl { display: flex; align-items: center; gap: 6px; }
+.hpctl select.in { flex: 1 1 8em; }
+.hpctl .in.w4 { width: 4.2em; }
+.chk.off { opacity: .4; cursor: default; }
 .hpnum { font: 400 44px/1 var(--font-m); font-variant-numeric: tabular-nums; }
 .hpnum small { font-size: 18px; color: var(--soft); }
 .pen { font-size: 13px; }
@@ -192,10 +196,13 @@ button.cell:hover { background: var(--head); }
 .cond.on .lbl { color: var(--ink); }
 
 /* ---------- shooting ---------- */
-.result { display: flex; align-items: center; gap: 14px; border: 2px solid var(--ink); background: var(--bg); padding: 10px 12px; }
-.need { font: 400 46px/1 var(--font-m); flex: none; }
-.result b { font-weight: 700; }
-.rolllog { display: grid; gap: 4px; font-size: 14px; }
+.calcres { display: grid; grid-template-columns: repeat(auto-fit, minmax(56px, 1fr)); gap: 1px; background: var(--line); border: 2px solid var(--ink); }
+.shot { background: var(--bg); padding: 10px 4px 8px; display: grid; justify-items: center; align-content: center; gap: 4px; min-height: 84px; }
+.shot .k { font: 500 11px/1 var(--font-d); text-transform: uppercase; letter-spacing: .08em; color: var(--soft); }
+.shot .n { font: 400 34px/1 var(--font-m); }
+.calcres .shot:only-child .n { font-size: 46px; }
+.shot .p { font: 12px/1 var(--font-m); color: var(--soft); }
+.cgroup { display: grid; gap: 8px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .formula { font: 12px/1.4 var(--font-m); color: var(--soft); }
 
 /* ---------- lists ---------- */
