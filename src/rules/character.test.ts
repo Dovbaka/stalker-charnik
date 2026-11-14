@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CATALOG } from "./catalog";
-import { GUNS, MARKET } from "./data";
-import { SHOT0, migrateCart, addGun, addMarketItem, quickDraw, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newArmor, newDraft, rangedWeapons, reload, resolveShot, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem, wear, weaponModes, weightParts, worn } from "./character";
+import { GUNS, MARKET, modPreset } from "./data";
+import { SHOT0, migrateCart, addArmor, addGun, newMod, addMarketItem, quickDraw, blankCharacter, cartTotals, dawnLuck, derive, finishDraft, maxHp, migrate, newArmor, newDraft, rangedWeapons, reload, resolveShot, setHp, setLuckPool, shotCalc, skillCost, skillLeft, spendLuck, takeDamage, useItem, wear, weaponModes, weightParts, worn } from "./character";
 import { decode, encode } from "./codes";
 import type { Character } from "./types";
 
@@ -150,6 +150,18 @@ describe("gear", () => {
     expect(c.items[0].qty).toBe(195);
   });
 
+  it("armour-piercing rounds load only once the ordinary ones of that calibre run out", () => {
+    const c = simka();
+    addMarketItem(c, MARKET.find(m => m.ammo && m.cal === "9×18 БП")!);
+    expect(c.items[0].note).toContain("4 кінетичної");
+    c.weapons.push({ id: "g", name: "ПМ", skill: "pistols", dmg: "к10", mag: 8, cur: 0, modes: "", range: "", w: 0.5, cal: "9×18", nato: false, jams: 0, note: "", on: true, mods: [] });
+    expect(reload(c, "g")).toBe("Заряджено 8 бронебійних, у рюкзаку лишилось 92.");
+    addMarketItem(c, MARKET.find(m => m.ammo && m.cal === "9×18")!);
+    c.weapons[0].cur = 0;
+    expect(reload(c, "g")).toBe("Заряджено 8, у рюкзаку лишилось 92.");
+    expect(c.items.map(x => x.qty)).toEqual([92, 92]);
+  });
+
   it("antirad and vodka change radiation", () => {
     const c = simka(); c.rad = 300;
     addMarketItem(c, MARKET.find(m => m.fx === "antirad")!);
@@ -201,6 +213,25 @@ describe("armour and attachments", () => {
   });
 });
 
+describe("the GM's document of 2026-11-14", () => {
+  it("the standard catalogue has its armour, and taking one copies the note", () => {
+    const c = simka();
+    const exo = DEFAULT_CATALOG.armors.find(a => a.n === "Екзоскелет")!;
+    expect(exo).toMatchObject({ id: "a-11", kin: 15, w: 15, slots: 2, p: 100000 });
+    addArmor(c, exo);
+    expect(c.armors[1]).toMatchObject({ name: "Екзоскелет", note: "Без Ривка, Спритність −1.", on: false, countW: true });
+  });
+
+  it("a bipod takes away the penalty for shooting prone", () => {
+    const c = simka(), d = derive(c);
+    c.weapons.push({ id: "svd", name: "СВД", skill: "rifles", dmg: "2к10", mag: 10, cur: 10, modes: "одиночний", range: "", w: 5, cal: "7.62×54", nato: false, jams: 0, note: "", on: true, mods: [] });
+    const lying = () => shotCalc(c, d, resolveShot(c, { ...SHOT0, weapon: "svd", lying: true })).mod;
+    expect(lying()).toBe(5 - 2);
+    c.weapons[0].mods.push(newMod(modPreset("bipod")));
+    expect(lying()).toBe(5);
+  });
+});
+
 describe("weapon features from the GM's earlier document", () => {
   it("catalogue weapons arrive with their features; a laser counts outside automatic fire; the АН-94 bursts without −1", () => {
     const c = simka(), d = derive(c);
@@ -208,7 +239,7 @@ describe("weapon features from the GM's earlier document", () => {
     addGun(c, GUNS.find(g => g.n.startsWith("Драгунов"))!);
     const an = c.weapons[0], svd = c.weapons[1];
     expect(an.mods.map(m => m.kind)).toEqual(["burst0"]);
-    expect(svd.mods.map(m => m.kind)).toEqual(["heavy", "bulky"]);
+    expect(svd.mods.map(m => m.kind)).toEqual(["heavy", "bulky", "optic"]);
     expect(svd.range).toBe("Екстремальна");
     expect(shotCalc(c, d, resolveShot(c, { ...SHOT0, weapon: an.id, mode: "burst" })).shots.map(s => s.need)).toEqual([4, 4, 4]);
     an.mods.push({ id: "lz", name: "Лазерний цілевказівник", kind: "laser", bonus: 1 });

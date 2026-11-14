@@ -52,6 +52,7 @@ export type ModKind =
   | "optic" | "colim" | "laser" | "silencer"        // attachments that change a roll or detection
   | "grip" | "bulky" | "heavy"                       // handling and calibre
   | "bayonet" | "bigmag" | "doublemag" | "gl40"      // other attachments from the GM's earlier document
+  | "bipod"                                          // no penalty for shooting prone
   | "burst0" | "reliable" | "fragile"                // features of particular weapons
   | "other";
 export interface WeaponMod { id: string; name: string; kind: ModKind; bonus: number }
@@ -67,6 +68,8 @@ export interface Armor {
   /** false only for the starting leather jacket, which the rules leave out of the load */
   countW: boolean;
   slots: number;
+  /** special rules: worn over a suit, a helmet included, penalties */
+  note?: string;
   /** the one being worn; at most one armour is */
   on: boolean;
 }

@@ -202,6 +202,7 @@ function ArmorsBox({ c, ro, edit, up }: SheetApi) {
               <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
                 <b style={{ overflowWrap: "anywhere" }}>{a.name}</b>
                 <span className="hint num">кін {num(a.kin)} · кисл {num(a.acid)} · вог {num(a.fire)} · ел {num(a.elec)} · рад {num(a.rad)}</span>
+                {a.note && <span className="hint">{a.note}</span>}
               </div>
               <span className="iw num">{a.countW ? kg(num(a.w)) + " кг" : "—"}</span>
             </div>
@@ -213,6 +214,7 @@ function ArmorsBox({ c, ro, edit, up }: SheetApi) {
               <div className="fgrid">
                 <Lab name="Назва" wide><Text value={a.name} set={v => up(x => { x.armors[i].name = v; })} /></Lab>
                 {field(i, "Кінетика", "kin")}{field(i, "Кислота", "acid")}{field(i, "Вогонь", "fire")}{field(i, "Електрика", "elec")}{field(i, "Радіація", "rad")}{field(i, "Вага, кг", "w")}{field(i, "Контейнери", "slots")}
+                <Lab name="Примітка" wide><Text value={a.note ?? ""} set={v => up(x => { if (v) x.armors[i].note = v; else delete x.armors[i].note; })} /></Lab>
                 <Check wide checked={a.countW} set={v => up(x => { x.armors[i].countW = v; })}>Рахувати вагу у вантаж</Check>
               </div>
               <div><Confirm sm={false} label="Викинути броню" ask="Точно викинути?" title="Викинути броню" onConfirm={() => toast(`Викинуто: ${a.name}.`, up(x => { x.armors.splice(i, 1); }))} /></div>

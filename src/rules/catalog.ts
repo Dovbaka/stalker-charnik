@@ -2,13 +2,13 @@
 // It is one Firestore document, `catalog/main`, that only the GM can write. Until the GM first changes it,
 // the built-in lists from the rules documents stand in for it.
 // Taking a thing from the catalogue copies it into the sheet: later catalogue edits never touch sheets, and back.
-import { GUNS, GUN_GROUPS, MARKET, MOD_INFO, WEAPON_SKILLS, type GunEntry, type MarketEntry } from "./data";
+import { ARMORS, GUNS, GUN_GROUPS, MARKET, MOD_INFO, WEAPON_SKILLS, type ArmorEntry, type GunEntry, type MarketEntry } from "./data";
 import type { ItemEffect, ModKind, SkillKey } from "./types";
 import { uid } from "../util";
 
 export interface CatGun extends GunEntry { id: string; hidden?: boolean }
 export interface CatItem extends MarketEntry { id: string; hidden?: boolean }
-export interface CatArmor { id: string; n: string; kin: number; acid: number; fire: number; elec: number; rad: number; w: number; slots: number; p: number; hidden?: boolean }
+export interface CatArmor extends ArmorEntry { id: string; hidden?: boolean }
 export interface Catalog { guns: CatGun[]; items: CatItem[]; armors: CatArmor[] }
 export type CatKind = keyof Catalog;
 
@@ -16,7 +16,7 @@ export type CatKind = keyof Catalog;
 export const DEFAULT_CATALOG: Catalog = {
   guns: GUNS.map((g, i) => ({ ...g, id: `g-${i}` })),
   items: MARKET.map((m, i) => ({ ...m, id: `m-${i}` })),
-  armors: [],
+  armors: ARMORS.map((a, i) => ({ ...a, id: `a-${i}` })),
 };
 
 export const ITEM_FX: [ItemEffect | "", string][] = [["", "немає"], ["antirad", "антирад: −250 рад"], ["vodka", "горілка: −100 рад, +1 алкоголь"], ["sci", "наукова аптечка: −250 рад"]];
@@ -71,6 +71,7 @@ function readItem(o: Record<string, unknown>): CatItem {
 }
 function readArmor(o: Record<string, unknown>): CatArmor {
   const a: CatArmor = { id: str(o.id) || uid(), n: str(o.n, "Броня"), kin: nr(o.kin), acid: nr(o.acid), fire: nr(o.fire), elec: nr(o.elec), rad: nr(o.rad), w: nr(o.w), slots: nr(o.slots), p: nr(o.p) };
+  if (str(o.note)) a.note = str(o.note);
   if (o.hidden) a.hidden = true;
   return a;
 }

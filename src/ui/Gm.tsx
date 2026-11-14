@@ -83,7 +83,7 @@ export function GmMenu() {
     const list = cat.armors.filter(a => match(a.n));
     body = list.map(a => (
       <Entry key={a.id} id={a.id} name={a.n} price={a.p} hidden={!!a.hidden} open={open === a.id} toggle={() => toggle(a.id)}
-        meta={`кін ${a.kin} · кисл ${a.acid} · вог ${a.fire} · ел ${a.elec} · рад ${a.rad} · ${kg(a.w)} кг`}
+        meta={`кін ${a.kin} · кисл ${a.acid} · вог ${a.fire} · ел ${a.elec} · рад ${a.rad} · ${kg(a.w)} кг`} extra={a.note}
         setHidden={v => updArmor(a.id, x => { if (v) x.hidden = true; else delete x.hidden; })} remove={() => remove("armors", a.id)}>
         <ArmorFields a={a} set={fn => updArmor(a.id, fn)} />
       </Entry>
@@ -220,6 +220,7 @@ function ArmorFields({ a, set }: { a: CatArmor; set: (fn: (x: CatArmor) => void)
       <Lab name="Назва" wide><Text value={a.n} set={v => set(x => { x.n = v; })} /></Lab>
       {field("Кінетика", "kin")}{field("Кислота", "acid")}{field("Вогонь", "fire")}{field("Електрика", "elec")}{field("Радіація", "rad")}
       {field("Вага, кг", "w")}{field("Контейнери", "slots")}{field("Ціна, куп.", "p")}
+      <Lab name="Опис" wide><Text value={a.note ?? ""} set={v => set(x => { if (v) x.note = v; else delete x.note; })} /></Lab>
     </div>
   );
 }

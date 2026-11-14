@@ -97,7 +97,7 @@ function ShotBox({ c, d, ro, up }: SheetApi) {
           <div className="seg">
             {canOptic && flag("optic", "Оптика, від 50 м", "+1")}{canColim && flag("colim", "Коліматор, до 50 м", "+1")}
             {extras.map(md => <Tg key={md.id} on={o.mods.includes(md.id)} mod={sign(num(md.bonus)).replace(" ", "")} onClick={() => toggleMod(md.id)}>{md.name}</Tg>)}
-            {flag("lying", "Стріляю лежачи", "−2")}{flag("vis", "Туман, дощ", "−2")}
+            {flag("lying", "Стріляю лежачи", gun && hasMod(gun, "bipod") ? "сошки" : "−2")}{flag("vis", "Туман, дощ", "−2")}
             <Tg on={c.mask} mod="−1" disabled={ro} onClick={() => up(x => { x.mask = !x.mask; })}>Протигаз</Tg>
             {!gun && flag("nato", "Зброя НАТО", "+1")}
           </div>

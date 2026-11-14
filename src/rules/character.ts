@@ -306,7 +306,8 @@ export function shotCalc(c: Character, d: Derived, o: ShotOpts): ShotCalc {
   }
   if (o.vis) P("погана видимість", -2);
   if (o.invis) P("ціль невидима", -3);
-  if (o.lying) P("стрільба лежачи", -2);
+  const gw = gunOf(c, o);
+  if (o.lying && !(gw && hasMod(gw, "bipod"))) P("стрільба лежачи", -2);
   if (o.rounds) P("раунди по цілі", o.rounds);
   if (o.nato) P("зброя НАТО", 1);
   if (o.jam) P("заклинювання", -o.jam);
@@ -329,7 +330,7 @@ export function addMarketItem(c: Character, m: MarketEntry): void {
   if (m.ammo && m.cal && m.pack) {
     const it = c.items.find(x => x.ammo && x.cal === m.cal);
     if (it) it.qty = num(it.qty) + m.pack;
-    else c.items.push({ id: uid(), name: "Набої " + m.cal, qty: m.pack, w: Math.round(10000 / m.pack) / 10000, cal: m.cal, ammo: true, note: "" });
+    else c.items.push({ id: uid(), name: "Набої " + m.cal, qty: m.pack, w: Math.round(10000 / m.pack) / 10000, cal: m.cal, ammo: true, note: m.d ?? "" });
     return;
   }
   const name = m.n ?? "";
@@ -343,7 +344,7 @@ export function addMarketItem(c: Character, m: MarketEntry): void {
 export const newMod = (p: ModPreset) => ({ id: uid(), name: p.name, kind: p.kind, bonus: p.bonus });
 /** Copies a catalogue armour into the sheet, not worn yet. */
 export function addArmor(c: Character, a: CatArmor, id = uid()): void {
-  c.armors.push({ id, name: a.n, kin: a.kin, acid: a.acid, fire: a.fire, elec: a.elec, rad: a.rad, w: a.w, countW: true, slots: a.slots, on: false });
+  c.armors.push({ id, name: a.n, kin: a.kin, acid: a.acid, fire: a.fire, elec: a.elec, rad: a.rad, w: a.w, countW: true, slots: a.slots, on: false, ...(a.note ? { note: a.note } : {}) });
 }
 export function addGun(c: Character, g: GunEntry = CUSTOM_GUN, id = uid()): void {
   c.weapons.push({ id, name: g.n, skill: g.skill, dmg: g.dmg, mag: g.mag, cur: g.mag, modes: g.modes, range: g.range, w: g.w, cal: g.cal, nato: !!g.nato, jams: 0, note: g.note, on: true, mods: (g.mods ?? []).map(k => newMod(modPreset(k))) });
@@ -369,12 +370,14 @@ export function reload(c: Character, weaponId: string): string {
   if (!g) return "";
   const mag = num(g.mag), need = mag - clamp(num(g.cur), 0, mag);
   if (need <= 0) return "Магазин повний.";
-  const it = c.items.find(x => x.ammo && normCal(x.cal ?? "") === normCal(g.cal));
+  // ordinary rounds first; armour-piercing ones («… БП») of the same calibre when the ordinary have run out
+  const cal = normCal(g.cal), is = (k: string) => (x: Item) => !!x.ammo && normCal(x.cal ?? "") === k;
+  const it = c.items.find(x => is(cal)(x) && num(x.qty) > 0) ?? c.items.find(x => is(cal + "бп")(x) && num(x.qty) > 0) ?? c.items.find(is(cal));
   if (!it) { g.cur = mag; return `Набоїв ${g.cal || "цього калібру"} у рюкзаку немає, запас не списано.`; }
   const take = Math.min(need, num(it.qty));
   if (take <= 0) return "Набої в рюкзаку скінчилися.";
   it.qty = num(it.qty) - take; g.cur = num(g.cur) + take;
-  return `Заряджено ${take}, у рюкзаку лишилось ${it.qty}.`;
+  return `Заряджено ${take}${is(cal + "бп")(it) ? " бронебійних" : ""}, у рюкзаку лишилось ${it.qty}.`;
 }
 
 /* ---------- luck ---------- */
