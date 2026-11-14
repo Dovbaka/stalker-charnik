@@ -23,10 +23,6 @@ export function usePersisted<T>(key: string, initial: T): [T, (v: T) => void] {
   });
   return [v, next => { setV(next); try { localStorage.setItem(key, JSON.stringify(next)); } catch { /* private window */ } }];
 }
-export function usePersistedString(key: string, initial: string): [string, (v: string) => void] {
-  const [v, setV] = useState(() => { try { return localStorage.getItem(key) ?? initial; } catch { return initial; } });
-  return [v, next => { setV(next); try { localStorage.setItem(key, next); } catch { /* private window */ } }];
-}
 
 /* ---------- controls ---------- */
 type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { pri?: boolean; dng?: boolean; sm?: boolean; lg?: boolean; sq?: boolean; link?: boolean };

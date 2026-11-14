@@ -3,7 +3,8 @@ import { derive, type Derived } from "../rules/character";
 import type { Character } from "../rules/types";
 import { useCampaign } from "../state/context";
 import { cx } from "../util";
-import { Btn, usePersistedString } from "./bits";
+import { navigate, type SheetTab } from "../router";
+import { Btn } from "./bits";
 import { CardTab } from "./sheet/CardTab";
 import { CombatTab } from "./sheet/CombatTab";
 import { NotesTab } from "./sheet/NotesTab";
@@ -22,13 +23,13 @@ export interface SheetApi {
   up: (recipe: (c: Character) => void) => void;
 }
 
-const TABS: [string, string][] = [["sheet", "Картка"], ["combat", "Бій"], ["pack", "Рюкзак"], ["notes", "Нотатки"]];
+const TABS: [SheetTab, string][] = [["sheet", "Картка"], ["combat", "Бій"], ["pack", "Рюкзак"], ["notes", "Нотатки"]];
 
-export function Sheet({ id, menu }: { id: string; menu: () => void }) {
+/** One sheet. The tab comes from the address, so a reload or a shared link opens the same place. */
+export function Sheet({ id, tab }: { id: string; tab: SheetTab }) {
   const [st, camp] = useCampaign();
   const c = camp.charOf(id);
   const own = camp.isMine(id);
-  const [tab, setTab] = usePersistedString("charnik.tab", "sheet");
   const [edit, setEdit] = useState(false);
   const [online, setOnline] = useState(() => navigator.onLine);
   const [resting, setResting] = useState(false);
@@ -41,13 +42,20 @@ export function Sheet({ id, menu }: { id: string; menu: () => void }) {
     window.addEventListener("online", f); window.addEventListener("offline", f);
     return () => { window.removeEventListener("online", f); window.removeEventListener("offline", f); };
   }, []);
+  // the browser tab and its history show whose sheet this is
+  const callsign = c?.id.callsign || "Без позивного";
+  useEffect(() => {
+    document.title = `${callsign} · S.T.A.L.K.E.R. TTRPG`;
+    return () => { document.title = "S.T.A.L.K.E.R. TTRPG"; };
+  }, [callsign]);
 
   if (!c || !d) return null;
   const api: SheetApi = { c, d, ro: !own, edit: own && edit, up: fn => camp.update(id, fn) };
   const owner = st.entries[id]?.ownerName ?? "";
-  const current = TABS.some(t => t[0] === tab) ? tab : "sheet";
+  const current = tab;
+  // switching tabs replaces the address: Back leaves the sheet instead of walking through its tabs
   const tabs = TABS.map(([k, n]) => (
-    <button type="button" key={k} className={cx("tab", current === k && "on")} aria-current={current === k ? "page" : undefined} onClick={() => { setTab(k); window.scrollTo(0, 0); }}>{n}</button>
+    <button type="button" key={k} className={cx("tab", current === k && "on")} aria-current={current === k ? "page" : undefined} onClick={() => navigate({ name: "sheet", id, tab: k }, true)}>{n}</button>
   ));
   // Saving is quiet; only a problem is worth a word.
   const status = !own ? "Лише перегляд" : st.sync === "err" ? "Не збережено" : st.sync === "saving" && !online ? "Без мережі, збережеться потім" : "";
@@ -63,7 +71,7 @@ export function Sheet({ id, menu }: { id: string; menu: () => void }) {
           <span className={`stamp l${d.level}`}>{d.label}</span>
           <div className="row wrapg" style={{ justifyContent: "flex-end" }}>
             {status && <span className={cx("sync", own && st.sync === "err" && "s-err", own && st.sync === "saving" && "s-saving")}>{status}</span>}
-            <Btn sm onClick={menu}>Персонажі</Btn>
+            <Btn sm onClick={() => navigate({ name: "roster" })}>Персонажі</Btn>
             {own && <Btn sm onClick={() => setResting(true)}>Відпочити</Btn>}
             {own && <Btn sm pri={edit} onClick={() => setEdit(!edit)}>{edit ? "Готово" : "Правити"}</Btn>}
           </div>

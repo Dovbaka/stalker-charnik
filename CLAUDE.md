@@ -20,6 +20,7 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 
 - `src/rules/` — the game's rules as pure TypeScript, no React or Firebase. `data.ts` holds the tables (attributes, skills, market, guns), `character.ts` computes everything from a sheet (`derive`, `shotCalc`, damage, gear, the creation draft), `codes.ts` makes backup codes. Every rule change gets a test in `character.test.ts`.
 - `src/backend/` — `Backend` interface with two implementations: `firebase.ts` (production) and `memory.ts` (demo and tests).
+- `src/router.ts` — addresses on the History API, no library: `/` roster, `/new` wizard, `/c/{id}` a sheet on Картка, `/c/{id}/combat|pack|notes` the other tabs. Opening a screen pushes an address; switching tabs and leaving the wizard replace it, so Back goes from a sheet to the roster. The query string is kept, so `?demo` survives navigation.
 - `src/state/campaign.ts` — the store outside React: sign-in, all sheets, my sheets being edited, debounced saves, private notes. Components read it with `useCampaign()`.
 - `src/ui/` — screens. `bits.tsx` has the shared controls. `Sheet.tsx` is the frame, `sheet/*Tab.tsx` are its four tabs. Each box of the sheet gets a `SheetApi` (`c`, `d`, `ro`, `edit`, `up`).
 - `src/styles.css` — all styling, as design tokens on `:root` with a dark variant. No UI library.
@@ -63,6 +64,7 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 - Attribute tiles on Картка show the full names in normal case without letter spacing (`.attr .lbl`), because capitals with spacing do not fit five tiles on a phone. «Сприйняття» keeps the GM's name. On 2026-11-14 the owner tried «Уважність» with one-letter tiles, then went back to the full names.
 - Weapons, armour and items each have a «Змінити» button outside «Правити». It opens that thing's fields and «Викинути». A new armour or an own weapon opens its fields at once. «Правити» is for the character's build (attributes, skills, abilities), not for gear.
 - Health green is muted (`--l0` #709654): the earlier bright green was too harsh on the bar.
+- After sign-in the home page is the roster, not the last sheet (owner, 2026-11-14). A reload or a shared link opens the sheet and tab in the address; a sheet that is not in the base sends the person back to the roster.
 - Done in that pass: luck (pool typed in the wizard, may stay 0; spend 1/3/5; +2 at dawn, +3 in safety, never above the pool; +1 per point and luck rerolls in the shot calculator).
 
 ## Roadmap (agreed with the owner, in this order)
