@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // The GM, by Firebase Auth user id. src/roles.ts (GM_UIDS) holds the same list: change both together.
     function isGM() {
-      return request.auth != null && request.auth.uid in ['NS1EKdmeqNeSAYJ6NsNeTiRL1YI3'];
+      return request.auth != null && request.auth.uid in ['NS1EKdmeqNeSAYJ6NsNeTiRL1YI3', 'sPvYhHljb1hkwgThRhKKIwYcgOG3'];
     }
     // On another player's sheet the GM changes only health, radiation, conditions and gear.
     // src/roles.ts (GM_FIELDS) holds the same list of sheet fields.
