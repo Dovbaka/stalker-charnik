@@ -13,7 +13,7 @@
   --amber: #f0b73a;
   --red: #ee6048;
   /* health colour by wounds: none, one, two, three or worse */
-  --l0: #86c06a;
+  --l0: #709654;
   --l1: #e3c34a;
   --l2: #f08a3c;
   --l3: #ee5a44;
@@ -184,6 +184,7 @@ button.cell:hover { background: var(--head); }
 .attrs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; background: var(--line); }
 .attr { background: var(--box); padding: 12px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
 .attr .v { font: 30px/1 var(--font-m); }
+.attr .lbl { font-size: 16px; letter-spacing: .04em; }
 .attr .was { font: 11px/1 var(--font-m); color: var(--soft); }
 .mods { padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 4px; border-top: 1px solid var(--line); }
 .edlist { padding: 4px 12px 12px; display: grid; border-top: 1px solid var(--line); }

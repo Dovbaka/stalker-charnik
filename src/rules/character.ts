@@ -353,7 +353,7 @@ export function useItem(c: Character, id: string): string {
   const it = c.items.find(x => x.id === id);
   if (!it || num(it.qty) <= 0) return "";
   if (it.fx === "antirad") { it.qty--; c.rad = Math.max(0, c.rad - 250); return "Антирад: −250 рад."; }
-  if (it.fx === "vodka") { it.qty--; c.rad = Math.max(0, c.rad - 100); c.vodka = Math.min(9, c.vodka + 1); return "Горілка: −100 рад, −1 до Мудрості, Реакції, Сприйняття і Спритності."; }
+  if (it.fx === "vodka") { it.qty--; c.rad = Math.max(0, c.rad - 100); c.vodka = Math.min(9, c.vodka + 1); return "Горілка: −100 рад, −1 до Мудрості, Реакції, Уважності і Спритності."; }
   if (it.fx === "sci") { c.rad = Math.max(0, c.rad - 250); useCharge(it); return "Наукова аптечка: −250 рад, одне використання."; }
   return "";
 }
