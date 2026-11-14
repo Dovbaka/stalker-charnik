@@ -7,7 +7,7 @@ import { GUN_GROUPS, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketNam
 import type { ItemEffect, ModKind, SkillKey } from "../rules/types";
 import { useCampaign } from "../state/context";
 import { cx, kg } from "../util";
-import { Box, Btn, Check, Confirm, Lab, NumIn, Text } from "./bits";
+import { Box, Btn, Check, Confirm, IconPeople, Lab, NumIn, Text } from "./bits";
 
 const KINDS: [CatKind, string][] = [["guns", "Зброя"], ["armors", "Броня"], ["items", "Речі"]];
 const RANGES = ["Близька", "Коротка", "Середня", "Далека", "Екстремальна"];
@@ -97,7 +97,7 @@ export function GmMenu() {
         <div className="who"><h1>Меню майстра</h1><div className="sub">Каталог, з якого гравці беруть речі</div></div>
         <div className="top-r">
           <span className={cx("sync", st.catalogSync === "err" && "s-err", st.catalogSync === "saving" && "s-saving")} style={{ visibility: status ? "visible" : "hidden" }}>{status || "·"}</span>
-          <Btn sm onClick={() => navigate({ name: "roster" })}>Персонажі</Btn>
+          <Btn sm className="ib" onClick={() => navigate({ name: "roster" })}><IconPeople />Персонажі</Btn>
         </div>
       </header>
       <nav className="tabs gmtabs" aria-label="Розділи каталогу">

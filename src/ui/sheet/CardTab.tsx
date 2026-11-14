@@ -38,7 +38,7 @@ function Vitals(api: SheetApi) {
           {pool > 0 && pool <= 12 && <Dots cls="pips" on={cur} of={pool} />}
         </button>
         <button type="button" className={cx("cell", open === "move" && "on")} aria-expanded={open === "move"} onClick={() => toggle("move")}>
-          <span className="cell-h"><span className="lbl">Хід</span><Steps className="ico move" /></span>
+          <span className="cell-h"><span className="lbl">Швидкість</span><Steps className="ico move" /></span>
           <span className={cx("v", spr < num(c.attrs.spr) && "neg")}>{move}<small> м</small></span>
         </button>
       </div>
@@ -56,7 +56,7 @@ function Vitals(api: SheetApi) {
       )}
       {open === "luck" && <Box title="Удача" ro={ro || api.gm}><LuckControls {...api} ro={ro || api.gm} /></Box>}
       {open === "move" && (
-        <Box title="Хід">
+        <Box title="Швидкість">
           <div className="pad">
             <KV k="Рух · додаткова дія"><span className="num">{move} м</span></KV>
             <KV k="Ривок · основна дія"><span className="num">{move * 2} м</span></KV>
@@ -195,7 +195,7 @@ function CondBox({ c, d, ro, edit, up }: SheetApi) {
   return (
     <Box title="Стани" ro={ro}>
       <div className="conds">
-        {cell("Алкоголь", c.vodka, 9, v => up(x => { x.vodka = v; }), !d.vodkaOut && d.nextVodkaOut, d.nextVodkaOut ? "Ще одна порція — непритомність" : undefined)}
+        {cell("Алкоголь", c.vodka, 9, v => up(x => { x.vodka = v; }), c.vodka > 0 && !d.vodkaOut && d.nextVodkaOut, d.nextVodkaOut ? (c.vodka > 0 ? "Ще одна порція — непритомність" : "Перша ж порція — непритомність") : undefined)}
         {cell("Без сну", c.noSleep, 3, v => up(x => { x.noSleep = v; }))}
         {cell("Без їжі", c.noFood, 9, v => up(x => { x.noFood = v; }))}
         {cell("Без води", c.noWater, 9, v => up(x => { x.noWater = v; }))}

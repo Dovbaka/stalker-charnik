@@ -142,6 +142,36 @@ export function Trefoil({ className = "tre" }: { className?: string }) {
   return <svg className={className} viewBox="-12 -12 24 24" aria-hidden="true"><g fill="currentColor"><circle r="2.3" />{[90, 210, 330].map(a => <path key={a} d={BLADE} transform={`rotate(${a})`} />)}</g></svg>;
 }
 
+/** Line icons for buttons, drawn in the text colour. */
+const line = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+export function IconPeople({ className = "bi" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true" {...line}>
+      <circle cx="9" cy="8" r="3.2" /><path d="M3.5 19.5c.6-3.3 2.8-5.2 5.5-5.2s4.9 1.9 5.5 5.2" />
+      <circle cx="16.6" cy="8.8" r="2.6" /><path d="M16 14.3c2.3.2 4 1.9 4.6 5.2" />
+    </svg>
+  );
+}
+/** A campfire: resting. */
+export function IconFire({ className = "bi" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true" {...line}>
+      <path d="M12 2.8c.9 2.7 3.7 3.9 3.7 7.2a3.7 3.7 0 0 1-7.4 0c0-1.7.8-2.7 1.7-3.5.2 1.2.8 2 1.6 2.3-.4-1.9-.5-4.2.4-6z" />
+      <path d="M4.5 20.5l15-4M4.5 16.5l15 4" />
+    </svg>
+  );
+}
+export function IconPencil({ className = "bi" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true" {...line}>
+      <path d="M4 20l1.1-4.6L15.6 4.9a2.1 2.1 0 0 1 3 3L8.1 18.4z" /><path d="M13.6 6.9l3 3" />
+    </svg>
+  );
+}
+export function IconCheck({ className = "bi" }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" aria-hidden="true" {...line}><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>;
+}
+
 /** A three-leaf clover, the mark of luck. */
 export function Clover({ className }: { className?: string }) {
   return (

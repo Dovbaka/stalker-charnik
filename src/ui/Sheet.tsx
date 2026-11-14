@@ -5,7 +5,7 @@ import type { Undo } from "../state/campaign";
 import { useCampaign } from "../state/context";
 import { cx } from "../util";
 import { navigate, type SheetTab } from "../router";
-import { Btn } from "./bits";
+import { Btn, IconCheck, IconFire, IconPencil, IconPeople } from "./bits";
 import { CardTab } from "./sheet/CardTab";
 import { CombatTab } from "./sheet/CombatTab";
 import { NotesTab } from "./sheet/NotesTab";
@@ -75,9 +75,9 @@ export function Sheet({ id, tab }: { id: string; tab: SheetTab }) {
           <span className={`stamp l${d.level}`}>{d.label}</span>
           <div className="row wrapg" style={{ justifyContent: "flex-end" }}>
             {status && <span className={cx("sync", !api.ro && st.sync === "err" && "s-err", !api.ro && st.sync === "saving" && "s-saving")}>{status}</span>}
-            <Btn sm onClick={() => navigate({ name: "roster" })}>Персонажі</Btn>
-            {own && <Btn sm onClick={() => setResting(true)}>Відпочити</Btn>}
-            {own && <Btn sm pri={edit} onClick={() => setEdit(!edit)}>{edit ? "Готово" : "Редагувати"}</Btn>}
+            <Btn sm className="ib" onClick={() => navigate({ name: "roster" })}><IconPeople />Персонажі</Btn>
+            {own && <Btn sm className="ib" onClick={() => setResting(true)}><IconFire />Відпочити</Btn>}
+            {own && <Btn sm pri={edit} className="ib" onClick={() => setEdit(!edit)}>{edit ? <><IconCheck />Готово</> : <><IconPencil />Редагувати</>}</Btn>}
           </div>
         </div>
       </header>

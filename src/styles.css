@@ -176,11 +176,15 @@ button.cell { cursor: pointer; }
 button.cell:hover { background: var(--head); }
 .cell.on { border-color: var(--ink); background: var(--head); }
 .cell .v { font: 24px/1 var(--font-m); font-variant-numeric: tabular-nums; }
-.cell-h { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-.ico { width: 18px; height: 18px; flex: none; }
-.ico.rad { color: var(--amber); }
-.ico.luck { color: var(--olive); }
-.ico.move { color: var(--soft); }
+.cell { container-type: inline-size; }
+.cell-h { display: flex; justify-content: space-between; align-items: center; gap: 5px; }
+.cell .lbl { letter-spacing: .05em; white-space: nowrap; }
+.ico { width: 16px; height: 16px; flex: none; color: var(--ink); }
+/* on the narrowest phones the word needs the whole cell */
+@container (max-width: 77px) { .cell .ico { display: none; } }
+/* a button with an icon before its word */
+.btn.ib { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn .bi { width: 15px; height: 15px; flex: none; }
 .cell .v small { font-size: 14px; color: var(--soft); }
 .pips { font-size: 9px; letter-spacing: 2px; color: var(--olive); line-height: 1; }
 .pips .off, .dots .off { color: var(--line); }
