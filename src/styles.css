@@ -156,8 +156,9 @@ textarea.in { display: block; resize: vertical; line-height: 1.45; }
 .dialog { width: min(100%, 480px); margin-block: auto; outline: none; }
 .dialog > h2 { position: sticky; top: 0; z-index: 1; }
 .dialog.wide { width: min(100%, 560px); }
-/* the artefact form: type and rarity get room for their longest word */
-.fgrid.artform { grid-template-columns: repeat(auto-fit, minmax(9.5em, 1fr)); }
+/* forms in a dialog: two columns, so selects keep room for their longest word; a long select spans both on a phone */
+.dialog .fgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 440px) { .dialog .fgrid .wsm { grid-column: 1 / -1; } }
 .hpctl select.in { flex: 1 1 100%; }
 .hpctl .in.hpamt { width: 4.2em; flex: none; }
 .hpctl .btn.hurt, .hpctl .btn.heal { flex: 1 1 0; min-width: 0; font-size: 14px; }

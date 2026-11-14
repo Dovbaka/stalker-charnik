@@ -2,8 +2,8 @@
 // It is one Firestore document, `catalog/main`, that only the GM can write. Until the GM first changes it,
 // the built-in lists from the rules documents stand in for it.
 // Taking a thing from the catalogue copies it into the sheet: later catalogue edits never touch sheets, and back.
-import { ARMORS, ARTIFACTS, ART_FX_INFO, ART_RARITY, ART_TYPES, GUNS, GUN_GROUPS, MARKET, MOD_INFO, WEAPON_SKILLS, type ArmorEntry, type ArtifactEntry, type GunEntry, type MarketEntry } from "./data";
-import type { ArtFx, ArtRarity, ArtType, ItemEffect, ModKind, SkillKey } from "./types";
+import { ARMORS, ARTIFACTS, ART_FX_INFO, ART_RARITY, ART_TYPES, GUNS, GUN_GROUPS, ITEM_FX_INFO, LEGACY_ITEM_FX, MARKET, MOD_INFO, WEAPON_SKILLS, type ArmorEntry, type ArtifactEntry, type GunEntry, type MarketEntry } from "./data";
+import type { ArtFx, ArtRarity, ArtType, ItemFx, ModKind, SkillKey } from "./types";
 import { uid } from "../util";
 
 export interface CatGun extends GunEntry { id: string; hidden?: boolean }
@@ -21,7 +21,6 @@ export const DEFAULT_CATALOG: Catalog = {
   artifacts: ARTIFACTS.map((a, i) => ({ ...a, fx: { ...a.fx }, id: `r-${i}` })),
 };
 
-export const ITEM_FX: [ItemEffect | "", string][] = [["", "немає"], ["antirad", "антирад: −250 рад"], ["vodka", "горілка: −100 рад, +1 алкоголь"], ["sci", "наукова аптечка: −250 рад"]];
 
 /** What a player sees: the GM hides entries that are not open to players yet. */
 export function forViewer(cat: Catalog, gm: boolean): Catalog {
@@ -42,18 +41,25 @@ export function gunGroups(guns: CatGun[]): string[] {
   return out;
 }
 
-export const newCatGun = (): CatGun => ({ id: uid(), n: "Нова зброя", g: GUN_GROUPS[1], skill: "rifles", range: "Середня", mag: 10, dmg: "2к10", modes: "одиночний", w: 4, cal: "", p: 0, note: "", mods: [] });
-export const newCatItem = (): CatItem => ({ id: uid(), g: "Різне", n: "Нова річ", w: 0, p: 0 });
-export const newCatArmor = (): CatArmor => ({ id: uid(), n: "Нова броня", kin: 0, acid: 0, fire: 0, elec: 0, rad: 0, w: 0, slots: 0, p: 0 });
+// a new entry starts without a name or group: the GM's dialog asks for both
+export const newCatGun = (): CatGun => ({ id: uid(), n: "", g: "", skill: "rifles", range: "Середня", mag: 10, dmg: "2к10", modes: "одиночний", w: 4, cal: "", p: 0, note: "", mods: [] });
+export const newCatItem = (): CatItem => ({ id: uid(), g: "", n: "", w: 0, p: 0 });
+export const newCatArmor = (): CatArmor => ({ id: uid(), n: "", kin: 0, acid: 0, fire: 0, elec: 0, rad: 0, w: 0, slots: 0, p: 0 });
 /** A new artefact keeps its properties from players until the GM unticks that. */
-export const newCatArtifact = (): CatArtifact => ({ id: uid(), n: "Новий артефакт", type: "grav", rarity: "common", d: "", note: "", fx: {}, p: 0, secret: true });
+export const newCatArtifact = (): CatArtifact => ({ id: uid(), n: "", type: "grav", rarity: "common", d: "", note: "", fx: {}, p: 0, secret: true });
 
 /* ---------- reading a stored catalogue: anything missing or malformed gets a safe value ---------- */
 const str = (v: unknown, d = "") => (typeof v === "string" ? v : d);
 const nr = (v: unknown, d = 0) => (typeof v === "number" && Number.isFinite(v) ? v : d);
 const rec = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const list = (v: unknown) => (Array.isArray(v) ? v.map(rec) : []);
-const FX = new Set<string>(["antirad", "vodka", "sci"]);
+/** «Вжити» as numbers; an old fixed action ("antirad", "vodka", "sci") becomes its numbers. Undefined when it does nothing. */
+export function readItemFx(v: unknown): ItemFx | undefined {
+  if (typeof v === "string") return LEGACY_ITEM_FX[v] ? { ...LEGACY_ITEM_FX[v] } : undefined;
+  const o = rec(v), fx: ItemFx = {};
+  for (const { key } of ITEM_FX_INFO) if (typeof o[key] === "number" && Number.isFinite(o[key])) fx[key] = Math.round(o[key] as number);
+  return Object.keys(fx).length ? fx : undefined;
+}
 
 function readGun(o: Record<string, unknown>): CatGun {
   const skill = (WEAPON_SKILLS as string[]).includes(str(o.skill)) ? (o.skill as SkillKey) : "rifles";
@@ -69,7 +75,8 @@ function readItem(o: Record<string, unknown>): CatItem {
   else { m.n = str(o.n, "Річ"); m.w = nr(o.w); }
   if (str(o.d)) m.d = str(o.d);
   if (nr(o.uses) > 0) m.uses = nr(o.uses);
-  if (FX.has(str(o.fx))) m.fx = o.fx as ItemEffect;
+  const fx = readItemFx(o.fx);
+  if (fx) m.fx = fx;
   if (o.hidden) m.hidden = true;
   return m;
 }

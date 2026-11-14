@@ -65,8 +65,8 @@ export function NumIn({ value, set, min = 0, className, label, placeholder }: { 
   return <input className={cx("in", className)} inputMode="decimal" value={raw} placeholder={placeholder} aria-label={label}
     onChange={e => { setRaw(e.target.value); set(Math.max(min, num(e.target.value, 0))); }} />;
 }
-export function Lab({ name, wide, children }: { name: string; wide?: boolean; children: ReactNode }) {
-  return <label className={cx("fl", wide && "wide")}><span>{name}</span>{children}</label>;
+export function Lab({ name, wide, className, children }: { name: string; wide?: boolean; className?: string; children: ReactNode }) {
+  return <label className={cx("fl", wide && "wide", className)}><span>{name}</span>{children}</label>;
 }
 export function Check({ checked, set, children, wide, disabled }: { checked: boolean; set: (v: boolean) => void; children: ReactNode; wide?: boolean; disabled?: boolean }) {
   return <label className={cx("chk", wide && "wide", disabled && "off")}><input type="checkbox" checked={checked} disabled={disabled} onChange={e => set(e.target.checked)} /> {children}</label>;

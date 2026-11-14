@@ -1,5 +1,5 @@
 // The GM's rules as data. Source: the rules document of the campaign.
-import type { ArtFx, ArtFxKey, ArtRarity, ArtType, AttrKey, ItemEffect, ModKind, SkillKey } from "./types";
+import type { ArtFx, ArtFxKey, ArtRarity, ArtType, AttrKey, ItemFx, ItemFxKey, ModKind, SkillKey } from "./types";
 
 export const ATTR_PTS = 16;
 export const SKILL_PTS = 18;
@@ -35,19 +35,19 @@ export interface MarketEntry {
   p: number;
   d?: string;
   uses?: number;
-  fx?: ItemEffect;
+  fx?: ItemFx;
   ammo?: boolean;
   cal?: string;
   pack?: number;
 }
 const AP = "бронебійні: ігнорують 4 кінетичної броні";
 export const MARKET: MarketEntry[] = [
-  { g: "Медицина", n: "Антирад", w: 0.1, p: 400, fx: "antirad", d: "виводить 250 рад" },
+  { g: "Медицина", n: "Антирад", w: 0.1, p: 400, fx: { rad: -250 }, d: "виводить 250 рад" },
   { g: "Медицина", n: "Бинт", w: 0.1, p: 40, d: "+2 до Медицини проти кровотечі" },
   { g: "Медицина", n: "Аптечка", w: 0.5, p: 300, uses: 3, d: "+4 до лікування ран, 3 використання" },
   { g: "Медицина", n: "Армійська аптечка", w: 0.5, p: 600, uses: 3, d: "+8 до лікування ран, 3 використання" },
-  { g: "Медицина", n: "Наукова аптечка", w: 0.5, p: 800, uses: 3, fx: "sci", d: "+8 до лікування, виводить 250 рад, 3 використання" },
-  { g: "Медицина", n: "Горілка «Козаки»", w: 0.5, p: 200, fx: "vodka", d: "виводить 100 рад, −1 до чотирьох характеристик" },
+  { g: "Медицина", n: "Наукова аптечка", w: 0.5, p: 800, uses: 3, fx: { rad: -250 }, d: "+8 до лікування, виводить 250 рад, 3 використання" },
+  { g: "Медицина", n: "Горілка «Козаки»", w: 0.5, p: 200, fx: { rad: -100, vodka: 1 }, d: "виводить 100 рад, −1 до чотирьох характеристик" },
   { g: "Їжа й вода", n: "Вода, 1 л", w: 1, p: 50, d: "денна норма" },
   { g: "Їжа й вода", n: "Хліб", w: 0.5, p: 40, d: "пів раціону" },
   { g: "Їжа й вода", n: "Ковбаса", w: 0.3, p: 40, d: "пів раціону" },
@@ -86,6 +86,14 @@ export const MARKET: MarketEntry[] = [
   { g: "Набої, 1 кг", ammo: true, cal: "9×18 БП", pack: 100, p: 1500, d: AP },
   { g: "Набої, 1 кг", ammo: true, cal: "9×19 БП", pack: 100, p: 1500, d: AP },
 ];
+/** What «Вжити» may change, in the order the GM's form offers it; `start` is the number a new line begins with. */
+export const ITEM_FX_INFO: { key: ItemFxKey; name: string; short: string; start: number }[] = [
+  { key: "rad", name: "Радіація, рад (+ отримує, − виводить)", short: "рад", start: -100 },
+  { key: "vodka", name: "Алкоголь, порцій", short: "алкоголь", start: 1 },
+  { key: "hp", name: "Здоров'я, ОЗ", short: "ОЗ", start: 1 },
+];
+/** The three fixed actions «Вжити» had before 2026-11-14, for catalogues and sheets saved with them. */
+export const LEGACY_ITEM_FX: Record<string, ItemFx> = { antirad: { rad: -250 }, vodka: { rad: -100, vodka: 1 }, sci: { rad: -250 } };
 export const marketName = (m: MarketEntry) => (m.ammo ? `Набої ${m.cal}, ${m.pack} шт` : m.n ?? "");
 
 export interface GunEntry {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { forViewer, gunGroups, itemGroups } from "../../rules/catalog";
 import { ART_FX_INFO, ART_RARITY, ART_TYPES, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName, modPreset } from "../../rules/data";
-import { MAX_SLOTS, addArmor, addArtifact, addGun, addMarketItem, artifactStates, artifactTotals, newArmor, newMod, slotsOf, useCharge, useItem, wear, weightParts, worn } from "../../rules/character";
+import { MAX_SLOTS, hasItemFx, itemFxText, addArmor, addArtifact, addGun, addMarketItem, artifactStates, artifactTotals, newArmor, newMod, slotsOf, useCharge, useItem, wear, weightParts, worn } from "../../rules/character";
 import type { ArtFx, Artifact, SkillKey } from "../../rules/types";
 import { useCampaign } from "../../state/context";
 import { cx, fmt, kg, num, uid } from "../../util";
@@ -276,8 +276,8 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
                 <b>{it.name}</b>
                 {it.uses != null && <span className="hint">у початому: {q > 0 ? num(it.uses) : 0}</span>}
               </div>
-              {it.fx && <Btn sm pri disabled={q <= 0} onClick={() => { let msg = ""; const undo = up(x => { msg = useItem(x, it.id); }); if (msg) toast(msg, undo); }}>Вжити</Btn>}
-              {it.uses != null && !it.fx && <Btn sm disabled={q <= 0} onClick={() => toast(`${it.name}: одне використання.`, up(x => useCharge(x.items[i])))}>Використати</Btn>}
+              {hasItemFx(it.fx) && <Btn sm pri disabled={q <= 0} title={`Вжити: ${itemFxText(it.fx)}`} onClick={() => { let msg = ""; const undo = up(x => { msg = useItem(x, it.id); }); if (msg) toast(msg, undo); }}>Вжити</Btn>}
+              {it.uses != null && !hasItemFx(it.fx) && <Btn sm disabled={q <= 0} onClick={() => toast(`${it.name}: одне використання.`, up(x => useCharge(x.items[i])))}>Використати</Btn>}
               <Stepper value={q} min={0} max={9999} set={v => up(x => { x.items[i].qty = v; })} />
               {/* weight and «Змінити» keep to the right edge, also when they wrap to a line of their own */}
               <span className="iend">

@@ -1,8 +1,8 @@
 // Everything the rules compute from a sheet. Pure functions: no React, no Firebase.
 // Functions that take a `c` and return nothing mutate it; call them inside an immer recipe.
 import { clamp, num, uid } from "../util";
-import { DEFAULT_CATALOG, readArtFx, type CatArmor, type CatArtifact, type Catalog } from "./catalog";
-import { ART_FX_INFO, ART_RARITY, ART_TYPES, ATTR_KEYS, ATTR_PTS, CUSTOM_GUN, RAD_PEN, SKILL_KEYS, SKILL_NAME, SKILL_PTS, START_MONEY, marketName, modPreset, type GunEntry, type MarketEntry, type ModPreset } from "./data";
+import { DEFAULT_CATALOG, readArtFx, readItemFx, type CatArmor, type CatArtifact, type Catalog } from "./catalog";
+import { ART_FX_INFO, ART_RARITY, ART_TYPES, ATTR_KEYS, ITEM_FX_INFO, ATTR_PTS, CUSTOM_GUN, RAD_PEN, SKILL_KEYS, SKILL_NAME, SKILL_PTS, START_MONEY, marketName, modPreset, type GunEntry, type MarketEntry, type ModPreset } from "./data";
 import type { Armor, ArtFxKey, ArtRarity, ArtType, Artifact, AttrKey, Character, Item, SkillKey, Weapon } from "./types";
 
 /* ---------- shape ---------- */
@@ -66,6 +66,7 @@ export function migrate(raw: unknown): Character {
   const armors = s.armors as Record<string, unknown>[];
   armors.forEach((a, i) => { a.on = !!a.on && armors.findIndex(x => x.on) === i; });
   s.artifacts = (s.artifacts as Record<string, unknown>[]).map(sheetArtifact);
+  for (const it of s.items as Record<string, unknown>[]) { const fx = readItemFx(it.fx); if (fx) it.fx = fx; else delete it.fx; }
   delete s.by;
   delete s.secret; // private notes live in their own document
   s.v = 2;
@@ -396,7 +397,7 @@ export function addMarketItem(c: Character, m: MarketEntry): void {
   if (it) { it.qty = num(it.qty) + 1; if (m.uses && !(num(it.uses) > 0)) it.uses = m.uses; return; }
   const o: Item = { id: uid(), name, qty: 1, w: m.w ?? 0, note: m.d ?? "" };
   if (m.uses) { o.uses = m.uses; o.max = m.uses; }
-  if (m.fx) o.fx = m.fx;
+  if (hasItemFx(m.fx)) o.fx = { ...m.fx };
   c.items.push(o);
 }
 export const newMod = (p: ModPreset) => ({ id: uid(), name: p.name, kind: p.kind, bonus: p.bonus });
@@ -412,14 +413,25 @@ export function useCharge(it: Item): void {
   it.uses = num(it.uses, 1) - 1;
   if (it.uses <= 0) { it.qty = Math.max(0, num(it.qty) - 1); it.uses = it.qty > 0 ? num(it.max, 3) : 0; }
 }
-/** Uses a consumable with a built-in effect; returns the line to show, or "" if nothing happened. */
+/** Whether «Вжити» does anything. */
+export const hasItemFx = (fx: Item["fx"]): fx is NonNullable<Item["fx"]> => !!fx && ITEM_FX_INFO.some(f => num(fx[f.key]) !== 0);
+const signed = (v: number) => (v > 0 ? "+" : "−") + Math.abs(v);
+/** "−250 рад, +1 алкоголь" */
+export const itemFxText = (fx: Item["fx"]) => ITEM_FX_INFO.filter(f => num(fx?.[f.key]) !== 0).map(f => `${signed(num(fx?.[f.key]))} ${f.short}`).join(", ");
+/**
+ * «Вжити»: applies the item's numbers (radiation 0..1000, alcohol 0..9, health through setHp) and takes one off the count,
+ * or one use off a kit. Returns the line to show, or "" if nothing happened.
+ */
 export function useItem(c: Character, id: string): string {
   const it = c.items.find(x => x.id === id);
-  if (!it || num(it.qty) <= 0) return "";
-  if (it.fx === "antirad") { it.qty--; c.rad = Math.max(0, c.rad - 250); return "Антирад: −250 рад."; }
-  if (it.fx === "vodka") { it.qty--; c.rad = Math.max(0, c.rad - 100); c.vodka = Math.min(9, c.vodka + 1); return "Горілка: −100 рад, −1 до Мудрості, Реакції, Сприйняття і Спритності."; }
-  if (it.fx === "sci") { c.rad = Math.max(0, c.rad - 250); useCharge(it); return "Наукова аптечка: −250 рад, одне використання."; }
-  return "";
+  if (!it || num(it.qty) <= 0 || !hasItemFx(it.fx)) return "";
+  const rad = num(it.fx.rad), vodka = num(it.fx.vodka), hp = num(it.fx.hp);
+  if (rad) c.rad = clamp(c.rad + rad, 0, 1000);
+  if (vodka) c.vodka = clamp(c.vodka + vodka, 0, 9);
+  if (hp) setHp(c, c.hp + hp);
+  const kit = it.uses != null;
+  if (kit) useCharge(it); else it.qty = num(it.qty) - 1;
+  return `${it.name}: ${itemFxText(it.fx)}${kit ? ", одне використання" : ""}.`;
 }
 const normCal = (s: string) => String(s || "").toLowerCase().replace(/[xх*]/g, "×").replace(/мм|\s/g, "");
 /** Refills the magazine from matching ammunition in the backpack; returns the line to show. */

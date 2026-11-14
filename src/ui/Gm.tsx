@@ -1,11 +1,13 @@
 // The GM's menu: the catalogue players take things from. Only the GM reaches this screen (route /gm).
-// Taking a thing copies it into the sheet, so editing or deleting an entry here never changes anyone's sheet.
+// Taking a thing copies it into the sheet, so editing or deleting an entry here never changes anyone's sheet
+// (one exception: making an artefact's properties public reveals them on every sheet that holds a copy).
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { produce } from "immer";
 import { navigate } from "../router";
-import { DEFAULT_CATALOG, ITEM_FX, gunGroups, itemGroups, newCatArmor, newCatArtifact, newCatGun, newCatItem, type CatArmor, type CatArtifact, type CatGun, type CatItem, type CatKind } from "../rules/catalog";
-import { ART_FX_INFO, ART_RARITY, ART_TYPES, GUN_GROUPS, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName } from "../rules/data";
-import type { ArtFxKey, ArtRarity, ArtType, ItemEffect, ModKind, SkillKey } from "../rules/types";
+import { DEFAULT_CATALOG, gunGroups, itemGroups, newCatArmor, newCatArtifact, newCatGun, newCatItem, type CatArmor, type CatArtifact, type CatGun, type CatItem, type CatKind } from "../rules/catalog";
+import { ART_FX_INFO, ART_RARITY, ART_TYPES, ITEM_FX_INFO, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName } from "../rules/data";
+import { itemFxText } from "../rules/character";
+import type { ArtRarity, ArtType, ModKind, SkillKey } from "../rules/types";
 import { FxChips } from "./sheet/PackTab";
 import { useCampaign } from "../state/context";
 import { cx, kg } from "../util";
@@ -14,50 +16,49 @@ import { Area, Box, Btn, Check, Confirm, IconPeople, Lab, NumIn, Text } from "./
 const KINDS: [CatKind, string][] = [["guns", "Зброя"], ["armors", "Броня"], ["items", "Речі"], ["artifacts", "Артефакти"]];
 const RARITY_NAME = Object.fromEntries(ART_RARITY) as Record<string, string>;
 const RANGES = ["Близька", "Коротка", "Середня", "Далека", "Екстремальна"];
+const TITLE: Record<CatKind, [string, string]> = { guns: ["Нова зброя", "Зброя"], items: ["Нова річ", "Річ"], armors: ["Нова броня", "Броня"], artifacts: ["Новий артефакт", "Артефакт"] };
+
+/** One entry being edited in the dialog, with its kind. */
+type Draft = { kind: "guns"; e: CatGun } | { kind: "items"; e: CatItem } | { kind: "armors"; e: CatArmor } | { kind: "artifacts"; e: CatArtifact };
 
 export function GmMenu() {
   const [st, camp] = useCampaign();
   const [kind, setKind] = useState<CatKind>("guns");
-  const [open, setOpen] = useState("");
   const [q, setQ] = useState("");
-  // artefacts change group when their type changes, so they are edited in a dialog over the list, on a draft
-  const [artDlg, setArtDlg] = useState<{ a: CatArtifact; isNew: boolean } | null>(null);
+  // every entry is edited in a dialog over the list, on a draft: a changed group or type would move it in the list
+  const [dlg, setDlg] = useState<{ d: Draft; isNew: boolean } | null>(null);
   const cat = st.catalog;
   const status = st.catalogSync === "err" ? "Не збережено" : st.catalogSync === "saving" ? "Зберігаю" : "";
 
-  const updGun = (id: string, fn: (x: CatGun) => void) => camp.updateCatalog(c => { const x = c.guns.find(e => e.id === id); if (x) fn(x); });
-  const updItem = (id: string, fn: (x: CatItem) => void) => camp.updateCatalog(c => { const x = c.items.find(e => e.id === id); if (x) fn(x); });
-  const updArmor = (id: string, fn: (x: CatArmor) => void) => camp.updateCatalog(c => { const x = c.armors.find(e => e.id === id); if (x) fn(x); });
   const remove = (k: CatKind, id: string) => camp.updateCatalog(c => {
     if (k === "guns") c.guns = c.guns.filter(e => e.id !== id);
     else if (k === "items") c.items = c.items.filter(e => e.id !== id);
     else if (k === "artifacts") c.artifacts = c.artifacts.filter(e => e.id !== id);
     else c.armors = c.armors.filter(e => e.id !== id);
   });
-  /** Saves the dialog's draft. Making properties public reveals them on every sheet that holds a copy. */
-  const saveArt = (a: CatArtifact, was: CatArtifact | null) => {
+  /** Writes the draft into the catalogue. Making an artefact's properties public reveals them on every sheet that holds a copy. */
+  const save = (d: Draft, was: Draft | null) => {
     camp.updateCatalog(c => {
-      const i = c.artifacts.findIndex(e => e.id === a.id);
-      if (i >= 0) c.artifacts[i] = a; else c.artifacts.push(a);
+      const list = c[d.kind] as { id: string }[];
+      const i = list.findIndex(e => e.id === d.e.id);
+      if (i >= 0) list[i] = d.e; else list.push(d.e);
     });
-    if (!a.secret && (!was || was.secret)) {
-      for (const id of Object.keys(st.mine)) camp.update(id, x => { for (const it of x.artifacts) if (it.catId === a.id && it.secret) it.secret = false; });
+    if (d.kind === "artifacts" && !d.e.secret && (!was || (was.e as CatArtifact).secret)) {
+      const id = d.e.id;
+      for (const sid of Object.keys(st.mine)) camp.update(sid, x => { for (const it of x.artifacts) if (it.catId === id && it.secret) it.secret = false; });
     }
-    setArtDlg(null);
+    setDlg(null);
+    if (!was) {
+      setQ("");
+      // the new entry lands in its group, which may be far down the list
+      window.setTimeout(() => document.getElementById("cat-" + d.e.id)?.scrollIntoView({ block: "center" }), 60);
+    }
   };
   const add = () => {
-    if (kind === "artifacts") { setArtDlg({ a: newCatArtifact(), isNew: true }); return; }
-    let id = "";
-    camp.updateCatalog(c => {
-      if (kind === "guns") { const e = newCatGun(); id = e.id; c.guns.push(e); }
-      else if (kind === "items") { const e = newCatItem(); id = e.id; c.items.push(e); }
-      else { const e = newCatArmor(); id = e.id; c.armors.push(e); }
-    });
-    setQ(""); setOpen(id);
-    // the new entry lands in its group, which may be far down the list
-    window.setTimeout(() => document.getElementById("cat-" + id)?.scrollIntoView({ block: "center" }), 60);
+    const d: Draft = kind === "guns" ? { kind, e: newCatGun() } : kind === "items" ? { kind, e: newCatItem() } : kind === "artifacts" ? { kind, e: newCatArtifact() } : { kind: "armors", e: newCatArmor() };
+    setDlg({ d, isNew: true });
   };
-  const toggle = (id: string) => setOpen(open === id ? "" : id);
+  const open = (d: Draft) => setDlg({ d, isNew: false });
   const match = (name: string) => !q.trim() || name.toLowerCase().includes(q.trim().toLowerCase());
 
   let body: ReactNode;
@@ -70,33 +71,25 @@ export function GmMenu() {
         <div key={grp}>
           <div className="wgh lbl">{grp}</div>
           {xs.map(g => (
-            <Entry key={g.id} id={g.id} name={g.n} price={g.p} hidden={!!g.hidden} open={open === g.id} toggle={() => toggle(g.id)}
+            <Entry key={g.id} id={g.id} name={g.n} price={g.p} hidden={!!g.hidden} edit={() => open({ kind: "guns", e: g })}
               meta={[g.range, g.dmg, g.cal, g.mag ? `магазин ${g.mag}` : "", g.nato ? "НАТО" : "", kg(g.w) + " кг"].filter(Boolean).join(" · ")}
-              extra={(g.mods ?? []).map(k => MOD_INFO[k].name).join(", ")}
-              setHidden={v => updGun(g.id, x => { if (v) x.hidden = true; else delete x.hidden; })} remove={() => remove("guns", g.id)}>
-              <GunFields g={g} set={fn => updGun(g.id, fn)} />
-            </Entry>
+              extra={(g.mods ?? []).map(k => MOD_INFO[k].name).join(", ")} />
           ))}
         </div>
       );
     });
   } else if (kind === "items") {
     const list = cat.items.filter(m => match(marketName(m)));
-    body = <>
-      <datalist id="cat-groups">{itemGroups(cat.items).map(g => <option key={g} value={g} />)}</datalist>
-      {itemGroups(list).map(grp => (
-        <div key={grp}>
-          <div className="wgh lbl">{grp}</div>
-          {list.filter(m => m.g === grp).map(m => (
-            <Entry key={m.id} id={m.id} name={marketName(m) || "Без назви"} price={m.p} hidden={!!m.hidden} open={open === m.id} toggle={() => toggle(m.id)}
-              meta={[m.ammo ? "" : kg(m.w ?? 0) + " кг", m.uses ? `використань ${m.uses}` : "", m.d].filter(Boolean).join(" · ")}
-              setHidden={v => updItem(m.id, x => { if (v) x.hidden = true; else delete x.hidden; })} remove={() => remove("items", m.id)}>
-              <ItemFields m={m} set={fn => updItem(m.id, fn)} />
-            </Entry>
-          ))}
-        </div>
-      ))}
-    </>;
+    body = itemGroups(list).map(grp => (
+      <div key={grp}>
+        <div className="wgh lbl">{grp}</div>
+        {list.filter(m => m.g === grp).map(m => (
+          <Entry key={m.id} id={m.id} name={marketName(m) || "Без назви"} price={m.p} hidden={!!m.hidden} edit={() => open({ kind: "items", e: m })}
+            meta={[m.ammo ? "" : kg(m.w ?? 0) + " кг", m.uses ? `використань ${m.uses}` : "", m.fx ? `«Вжити»: ${itemFxText(m.fx)}` : ""].filter(Boolean).join(" · ")}
+            extra={m.d} />
+        ))}
+      </div>
+    ));
   } else if (kind === "artifacts") {
     const list = cat.artifacts.filter(a => match(a.n));
     body = ART_TYPES.map(([t, tn]) => {
@@ -106,21 +99,17 @@ export function GmMenu() {
         <div key={t}>
           <div className="wgh lbl">{tn}</div>
           {xs.map(a => (
-            <Entry key={a.id} id={a.id} name={a.n} price={a.p} hidden={!!a.hidden} open={false} toggle={() => setArtDlg({ a, isNew: false })}
+            <Entry key={a.id} id={a.id} name={a.n} price={a.p} hidden={!!a.hidden} edit={() => open({ kind: "artifacts", e: a })}
               meta={[RARITY_NAME[a.rarity], a.secret ? "властивості приховані" : "властивості відомі"].join(" · ")} extra={a.note}
-              chips={<FxChips fx={a.fx} />} setHidden={() => {}} remove={() => {}}>{null}</Entry>
+              chips={<FxChips fx={a.fx} />} />
           ))}
         </div>
       );
     });
   } else {
-    const list = cat.armors.filter(a => match(a.n));
-    body = list.map(a => (
-      <Entry key={a.id} id={a.id} name={a.n} price={a.p} hidden={!!a.hidden} open={open === a.id} toggle={() => toggle(a.id)}
-        meta={`кін ${a.kin} · кисл ${a.acid} · вог ${a.fire} · ел ${a.elec} · рад ${a.rad} · ${kg(a.w)} кг`} extra={a.note}
-        setHidden={v => updArmor(a.id, x => { if (v) x.hidden = true; else delete x.hidden; })} remove={() => remove("armors", a.id)}>
-        <ArmorFields a={a} set={fn => updArmor(a.id, fn)} />
-      </Entry>
+    body = cat.armors.filter(a => match(a.n)).map(a => (
+      <Entry key={a.id} id={a.id} name={a.n} price={a.p} hidden={!!a.hidden} edit={() => open({ kind: "armors", e: a })}
+        meta={`кін ${a.kin} · кисл ${a.acid} · вог ${a.fire} · ел ${a.elec} · рад ${a.rad} · ${kg(a.w)} кг · контейнерів ${a.slots}`} extra={a.note} />
     ));
   }
   const empty = !cat[kind].length ? "Тут поки порожньо." : q.trim() ? "Нічого не знайдено." : "";
@@ -136,7 +125,7 @@ export function GmMenu() {
       </header>
       <nav className="tabs gmtabs" aria-label="Розділи каталогу">
         {KINDS.map(([k, n]) => (
-          <button type="button" key={k} className={cx("tab", kind === k && "on")} aria-current={kind === k ? "page" : undefined} onClick={() => { setKind(k); setOpen(""); }}>
+          <button type="button" key={k} className={cx("tab", kind === k && "on")} aria-current={kind === k ? "page" : undefined} onClick={() => setKind(k)}>
             {n} <span className="num">{cat[k].length}</span>
           </button>
         ))}
@@ -148,20 +137,19 @@ export function GmMenu() {
       <Box title={KINDS.find(x => x[0] === kind)![1]}>
         <div>{empty ? <p className="empty">{empty}</p> : body}</div>
       </Box>
-      {artDlg && <ArtifactDialog key={artDlg.a.id} start={artDlg.a} isNew={artDlg.isNew} close={() => setArtDlg(null)}
-        save={a => saveArt(a, artDlg.isNew ? null : artDlg.a)} remove={() => { remove("artifacts", artDlg.a.id); setArtDlg(null); }} />}
+      {dlg && <EntryDialog key={dlg.d.e.id} start={dlg.d} isNew={dlg.isNew} gunGroups={gunGroups(cat.guns)} itemGroups={itemGroups(cat.items)}
+        close={() => setDlg(null)} save={d => save(d, dlg.isNew ? null : dlg.d)} remove={() => { remove(dlg.d.kind, dlg.d.e.id); setDlg(null); }} />}
       <div className="gmfoot">
         <Confirm sm={false} label="Повернути стандартний каталог" ask="Точно? Усі зміни каталогу зникнуть" title="Повернути стандартний каталог"
-          onConfirm={() => { camp.updateCatalog(() => structuredClone(DEFAULT_CATALOG)); setOpen(""); }} />
+          onConfirm={() => camp.updateCatalog(() => structuredClone(DEFAULT_CATALOG))} />
       </div>
     </div>
   );
 }
 
-/** One catalogue entry: name, numbers and price; «Змінити» opens its fields, hiding and deleting. */
-function Entry({ id, name, meta, extra, chips, price, hidden, open, toggle, setHidden, remove, children }: {
-  id: string; name: string; meta: string; extra?: string; chips?: ReactNode; price: number; hidden: boolean; open: boolean;
-  toggle: () => void; setHidden: (v: boolean) => void; remove: () => void; children: ReactNode;
+/** One catalogue entry in the list: name, numbers, price; «Змінити» opens the dialog. */
+function Entry({ id, name, meta, extra, chips, price, hidden, edit }: {
+  id: string; name: string; meta: string; extra?: string; chips?: ReactNode; price: number; hidden: boolean; edit: () => void;
 }) {
   return (
     <div className={cx("card", hidden && "hid")} id={"cat-" + id}>
@@ -174,29 +162,131 @@ function Entry({ id, name, meta, extra, chips, price, hidden, open, toggle, setH
         </div>
         <div className="row" style={{ flex: "none" }}>
           <span className="hint num" style={{ whiteSpace: "nowrap" }}>{price ? `${price} куп.` : "без ціни"}</span>
-          <Btn sm pri={open} onClick={toggle}>{open ? "Готово" : "Змінити"}</Btn>
+          <Btn sm onClick={edit}>Змінити</Btn>
         </div>
       </div>
-      {open && <>
-        {children}
-        <div className="row between wrapg">
-          <Check checked={hidden} set={setHidden}>Приховано від гравців</Check>
-          <Confirm sm={false} label="Видалити з каталогу" ask="Точно видалити?" title="Видалити з каталогу" onConfirm={remove} />
-        </div>
-      </>}
     </div>
   );
 }
 
-function GunFields({ g, set }: { g: CatGun; set: (fn: (x: CatGun) => void) => void }) {
+/** What stops a draft from being saved, or "". */
+function problem(d: Draft): string {
+  const name = d.kind === "items" ? (d.e.ammo ? d.e.cal ?? "" : d.e.n ?? "") : d.e.n;
+  if (!name.trim()) return d.kind === "items" && d.e.ammo ? "Немає калібру." : "Немає назви.";
+  if ((d.kind === "guns" || d.kind === "items") && !d.e.g.trim()) return "Обери групу.";
+  return "";
+}
+
+/**
+ * The form over the list. Changes stay in a draft until «Додати» or «Зберегти»; «Скасувати», × and Escape drop them,
+ * so an unfinished entry never shows up in the catalogue.
+ */
+function EntryDialog({ start, isNew, gunGroups, itemGroups, save, remove, close }: {
+  start: Draft; isNew: boolean; gunGroups: string[]; itemGroups: string[]; save: (d: Draft) => void; remove: () => void; close: () => void;
+}) {
+  const [d, setD] = useState<Draft>(() => structuredClone(start));
+  const [err, setErr] = useState("");
+  const box = useRef<HTMLDivElement>(null);
+  // the parent passes a new close on every render; keep the latest without refocusing the dialog on each keystroke
+  const closeRef = useRef(close);
+  useEffect(() => { closeRef.current = close; });
+  useEffect(() => {
+    box.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeRef.current(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  // one setter per kind keeps the fields typed; the draft's kind never changes
+  const edit = <T,>(fn: (x: T) => void) => { setErr(""); setD(prev => produce(prev, p => { fn(p.e as T); })); };
+  const submit = () => {
+    const why = problem(d);
+    if (why) { setErr(why); return; }
+    save(d);
+  };
+  return (
+    <div className="overlay" role="presentation">
+      <div className="dialog wide box" role="dialog" aria-modal="true" aria-labelledby="cat-dlg-title" tabIndex={-1} ref={box}>
+        <h2 id="cat-dlg-title"><span>{TITLE[d.kind][isNew ? 0 : 1]}</span><Btn sm aria-label="Закрити" onClick={close}>×</Btn></h2>
+        <div className="pad">
+          {d.kind === "guns" && <GunFields g={d.e} groups={gunGroups} set={edit<CatGun>} />}
+          {d.kind === "items" && <ItemFields m={d.e} groups={itemGroups} set={edit<CatItem>} />}
+          {d.kind === "armors" && <ArmorFields a={d.e} set={edit<CatArmor>} />}
+          {d.kind === "artifacts" && <ArtifactFields a={d.e} set={edit<CatArtifact>} />}
+          <Check checked={!!d.e.hidden} set={v => edit<{ hidden?: boolean }>(x => { if (v) x.hidden = true; else delete x.hidden; })}>
+            Приховано від гравців: немає в їхньому списку, видає лише майстер
+          </Check>
+          {err && <div className="neg">{err}</div>}
+          <div className="row between wrapg">
+            <div className="row">
+              <Btn pri onClick={submit}>{isNew ? "Додати" : "Зберегти"}</Btn>
+              <Btn onClick={close}>Скасувати</Btn>
+            </div>
+            {!isNew && <Confirm sm={false} label="Видалити з каталогу" ask="Точно видалити?" title="Видалити з каталогу" onConfirm={remove} />}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A group from the list, or a new one typed in. A new entry starts with none chosen. */
+function GroupField({ value, groups, set }: { value: string; groups: string[]; set: (v: string) => void }) {
+  const [own, setOwn] = useState(value !== "" && !groups.includes(value));
+  return <>
+    <Lab name="Група" className="wsm">
+      <select className="in" value={own ? "__new" : value} onChange={e => { const v = e.target.value; setOwn(v === "__new"); set(v === "__new" ? "" : v); }}>
+        <option value="" disabled>— обери групу —</option>
+        {groups.map(g => <option key={g} value={g}>{g}</option>)}
+        <option value="__new">Нова група…</option>
+      </select>
+    </Lab>
+    {own && <Lab name="Назва нової групи"><Text value={value} set={set} /></Lab>}
+  </>;
+}
+
+/**
+ * Numbers picked from a list: only the picked ones show, each with its number and ×.
+ * Used for what an artefact changes and for what an item's «Вжити» does.
+ */
+function FxPicker<K extends string>({ title, info, fx, set, empty, hint }: {
+  title: string; info: { key: K; name: string; start: number }[]; fx: Partial<Record<K, number>>;
+  set: (fn: (fx: Partial<Record<K, number>>) => void) => void; empty: string; hint: string;
+}) {
+  const [pick, setPick] = useState<K | "">("");
+  const have = info.filter(f => fx[f.key] !== undefined), free = info.filter(f => fx[f.key] === undefined);
+  const next = free.find(f => f.key === pick) ?? free[0];
+  return (
+    <div className="fl wide">
+      <span>{title}</span>
+      {have.length === 0 && <div className="hint">{empty}</div>}
+      {have.map(f => (
+        <div className="row fxrow" key={f.key}>
+          <span className="fxn">{f.name}</span>
+          <NumIn className="w4 num" min={-9999} label={f.name} value={fx[f.key] ?? 0} set={v => set(x => { x[f.key] = Math.round(v); })} />
+          <Btn sm aria-label={`Прибрати: ${f.name}`} onClick={() => set(x => { delete x[f.key]; })}>×</Btn>
+        </div>
+      ))}
+      {next && (
+        <div className="row wrapg">
+          <select className="in" aria-label="Що додати" value={next.key} onChange={e => setPick(e.target.value as K)}>
+            {free.map(f => <option key={f.key} value={f.key}>{f.name}</option>)}
+          </select>
+          <Btn onClick={() => { set(x => { x[next.key] = next.start; }); setPick(""); }}>Додати</Btn>
+        </div>
+      )}
+      <div className="hint">{hint}</div>
+    </div>
+  );
+}
+
+function GunFields({ g, groups, set }: { g: CatGun; groups: string[]; set: (fn: (x: CatGun) => void) => void }) {
   const [mod, setMod] = useState<ModKind>("optic");
   const mods = g.mods ?? [];
-  const groups = GUN_GROUPS.includes(g.g) ? GUN_GROUPS : [...GUN_GROUPS, g.g];
   return (
     <div className="fgrid">
       <Lab name="Назва" wide><Text value={g.n} set={v => set(x => { x.n = v; })} /></Lab>
-      <Lab name="Група"><select className="in" value={g.g} onChange={e => set(x => { x.g = e.target.value; })}>{groups.map(n => <option key={n} value={n}>{n}</option>)}</select></Lab>
-      <Lab name="Навичка"><select className="in" value={g.skill} onChange={e => set(x => { x.skill = e.target.value as SkillKey; })}>{WEAPON_SKILLS.map(k => <option key={k} value={k}>{SKILL_NAME[k]}</option>)}</select></Lab>
+      <GroupField value={g.g} groups={groups} set={v => set(x => { x.g = v; })} />
+      <Lab name="Навичка" className="wsm"><select className="in" value={g.skill} onChange={e => set(x => { x.skill = e.target.value as SkillKey; })}>{WEAPON_SKILLS.map(k => <option key={k} value={k}>{SKILL_NAME[k]}</option>)}</select></Lab>
       <Lab name="Дальність"><select className="in" value={g.range} onChange={e => set(x => { x.range = e.target.value; })}><option value="">—</option>{RANGES.map(r => <option key={r} value={r}>{r}</option>)}</select></Lab>
       <Lab name="Шкода"><Text value={g.dmg} placeholder="2к10" set={v => set(x => { x.dmg = v; })} /></Lab>
       <Lab name="Магазин"><NumIn value={g.mag} set={v => set(x => { x.mag = Math.round(v); })} /></Lab>
@@ -222,12 +312,12 @@ function GunFields({ g, set }: { g: CatGun; set: (fn: (x: CatGun) => void) => vo
   );
 }
 
-function ItemFields({ m, set }: { m: CatItem; set: (fn: (x: CatItem) => void) => void }) {
+function ItemFields({ m, groups, set }: { m: CatItem; groups: string[]; set: (fn: (x: CatItem) => void) => void }) {
   return (
     <div className="fgrid">
       <Check wide checked={!!m.ammo} set={v => set(x => {
         if (v) { x.ammo = true; x.cal = x.cal || ""; x.pack = x.pack || 30; delete x.n; delete x.w; }
-        else { delete x.ammo; delete x.cal; delete x.pack; x.n = x.n || "Нова річ"; x.w = x.w ?? 0; }
+        else { delete x.ammo; delete x.cal; delete x.pack; x.n = x.n || ""; x.w = x.w ?? 0; }
       })}>Набої: назва складається з калібру й кількості</Check>
       {m.ammo ? <>
         <Lab name="Калібр"><Text value={m.cal ?? ""} placeholder="5.45×39" set={v => set(x => { x.cal = v; })} /></Lab>
@@ -236,14 +326,15 @@ function ItemFields({ m, set }: { m: CatItem; set: (fn: (x: CatItem) => void) =>
         <Lab name="Назва" wide><Text value={m.n ?? ""} set={v => set(x => { x.n = v; })} /></Lab>
         <Lab name="Вага однієї, кг"><NumIn value={m.w ?? 0} set={v => set(x => { x.w = v; })} /></Lab>
       </>}
-      <Lab name="Група"><input className="in" list="cat-groups" value={m.g} onChange={e => set(x => { x.g = e.target.value; })} /></Lab>
+      <GroupField value={m.g} groups={groups} set={v => set(x => { x.g = v; })} />
       <Lab name="Ціна, куп."><NumIn value={m.p} set={v => set(x => { x.p = Math.round(v); })} /></Lab>
       <Lab name="Використань у наборі"><NumIn value={m.uses ?? 0} set={v => set(x => { if (v > 0) x.uses = Math.round(v); else delete x.uses; })} /></Lab>
-      <Lab name="Дія кнопки «Вжити»">
-        <select className="in" value={m.fx ?? ""} onChange={e => set(x => { if (e.target.value) x.fx = e.target.value as ItemEffect; else delete x.fx; })}>
-          {ITEM_FX.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
-        </select>
-      </Lab>
+      {!m.ammo && (
+        <FxPicker title="Що робить кнопка «Вжити»" info={ITEM_FX_INFO} fx={m.fx ?? {}}
+          set={fn => set(x => { const fx = { ...(x.fx ?? {}) }; fn(fx); if (Object.keys(fx).length) x.fx = fx; else delete x.fx; })}
+          empty="Нічого: у гравця кнопки «Вжити» не буде."
+          hint="Кожне «Вжити» знімає одну штуку, а з набору одне використання. Радіація: мінус виводить, плюс додає." />
+      )}
       <Lab name="Опис" wide><Text value={m.d ?? ""} set={v => set(x => { if (v) x.d = v; else delete x.d; })} /></Lab>
     </div>
   );
@@ -262,75 +353,21 @@ function ArmorFields({ a, set }: { a: CatArmor; set: (fn: (x: CatArmor) => void)
   );
 }
 
-/** The artefact form over the list. Changes stay in a draft until «Зберегти»; «Скасувати», × and Escape drop them. */
-function ArtifactDialog({ start, isNew, save, remove, close }: { start: CatArtifact; isNew: boolean; save: (a: CatArtifact) => void; remove: () => void; close: () => void }) {
-  const [a, setA] = useState<CatArtifact>(() => structuredClone(start));
-  const set = (fn: (x: CatArtifact) => void) => setA(prev => produce(prev, fn));
-  const box = useRef<HTMLDivElement>(null);
-  // the parent passes a new close on every render; keep the latest without refocusing the dialog on each keystroke
-  const closeRef = useRef(close);
-  useEffect(() => { closeRef.current = close; });
-  useEffect(() => {
-    box.current?.focus();
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeRef.current(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-  return (
-    <div className="overlay" role="presentation">
-      <div className="dialog wide box" role="dialog" aria-modal="true" aria-labelledby="art-title" tabIndex={-1} ref={box}>
-        <h2 id="art-title"><span>{isNew ? "Новий артефакт" : "Артефакт"}</span><Btn sm aria-label="Закрити" onClick={close}>×</Btn></h2>
-        <div className="pad">
-          <ArtifactFields a={a} set={set} />
-          <Check checked={!!a.hidden} set={v => set(x => { if (v) x.hidden = true; else delete x.hidden; })}>Приховано від гравців: немає в списку, видає лише майстер</Check>
-          <div className="row between wrapg">
-            <div className="row">
-              <Btn pri onClick={() => save({ ...a, n: a.n.trim() || "Артефакт" })}>{isNew ? "Додати" : "Зберегти"}</Btn>
-              <Btn onClick={close}>Скасувати</Btn>
-            </div>
-            {!isNew && <Confirm sm={false} label="Видалити з каталогу" ask="Точно видалити?" title="Видалити з каталогу" onConfirm={remove} />}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /**
- * One artefact. Effects the sheet counts are picked from a list and given a number; only the picked ones show.
- * Anything the sheet cannot count (bleeding, healing) goes in words. New artefacts keep their properties from players.
+ * One artefact. Effects the sheet counts are picked from a list and given a number; anything it cannot count
+ * (bleeding, healing) goes in words. While its properties are hidden from players, the artefact does nothing.
  */
 function ArtifactFields({ a, set }: { a: CatArtifact; set: (fn: (x: CatArtifact) => void) => void }) {
-  const [pick, setPick] = useState<ArtFxKey | "">("");
-  const have = ART_FX_INFO.filter(f => a.fx[f.key] !== undefined), free = ART_FX_INFO.filter(f => a.fx[f.key] === undefined);
-  const next = free.find(f => f.key === pick) ?? free[0];
   return (
-    <div className="fgrid artform">
+    <div className="fgrid">
       <Lab name="Назва" wide><Text value={a.n} set={v => set(x => { x.n = v; })} /></Lab>
       <Lab name="Тип"><select className="in" value={a.type} onChange={e => set(x => { x.type = e.target.value as ArtType; })}>{ART_TYPES.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Lab>
       <Lab name="Поширеність"><select className="in" value={a.rarity} onChange={e => set(x => { x.rarity = e.target.value as ArtRarity; })}>{ART_RARITY.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Lab>
       <Lab name="Ціна, куп."><NumIn value={a.p} set={v => set(x => { x.p = Math.round(v); })} /></Lab>
       <Lab name="Опис" wide><Area value={a.d} rows={2} set={v => set(x => { x.d = v; })} /></Lab>
-      <div className="fl wide">
-        <span>Ефекти, які чарнік рахує сам</span>
-        {have.length === 0 && <div className="hint">Жодного. Додай зі списку нижче.</div>}
-        {have.map(f => (
-          <div className="row fxrow" key={f.key}>
-            <span className="fxn">{f.name}</span>
-            <NumIn className="w4 num" min={-99} label={f.name} value={a.fx[f.key] ?? 0} set={v => set(x => { x.fx[f.key] = Math.round(v); })} />
-            <Btn sm aria-label={`Прибрати: ${f.name}`} onClick={() => set(x => { delete x.fx[f.key]; })}>×</Btn>
-          </div>
-        ))}
-        {next && (
-          <div className="row wrapg">
-            <select className="in" aria-label="Який ефект додати" value={next.key} onChange={e => setPick(e.target.value as ArtFxKey)}>
-              {free.map(f => <option key={f.key} value={f.key}>{f.name}</option>)}
-            </select>
-            <Btn onClick={() => { set(x => { x.fx[next.key] = next.key === "radTurn" ? 5 : 1; }); setPick(""); }}>Додати ефект</Btn>
-          </div>
-        )}
-        <div className="hint">Мінус ослаблює: −4 захисту від електрики означає +4 шкоди електрикою. У радіації за хід плюс накопичує, мінус виводить.</div>
-      </div>
+      <FxPicker title="Ефекти, які чарнік рахує сам" info={ART_FX_INFO.map(f => ({ ...f, start: f.key === "radTurn" ? 5 : 1 }))} fx={a.fx}
+        set={fn => set(x => { fn(x.fx); })} empty="Жодного. Додай зі списку нижче."
+        hint="Мінус ослаблює: −4 захисту від електрики означає +4 шкоди електрикою. У радіації за хід плюс накопичує, мінус виводить." />
       <Lab name="Інші ефекти словами" wide><Text value={a.note} placeholder="кровотеча, лікування" set={v => set(x => { x.note = v; })} /></Lab>
       <Check wide checked={a.secret} set={v => set(x => { x.secret = v; })}>Властивості приховані від гравців: поки приховані, артефакт не діє</Check>
     </div>

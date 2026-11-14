@@ -164,8 +164,8 @@ describe("gear", () => {
 
   it("antirad and vodka change radiation", () => {
     const c = simka(); c.rad = 300;
-    addMarketItem(c, MARKET.find(m => m.fx === "antirad")!);
-    addMarketItem(c, MARKET.find(m => m.fx === "vodka")!);
+    addMarketItem(c, MARKET.find(m => m.n === "Антирад")!);
+    addMarketItem(c, MARKET.find(m => m.n === "Горілка «Козаки»")!);
     useItem(c, c.items[0].id);
     expect(c.rad).toBe(50);
     useItem(c, c.items[1].id);
@@ -416,5 +416,30 @@ describe("artefacts", () => {
     c.artifacts[0].secret = false;
     expect(artifactStates(c).b1).toBe("on");
     expect(derive(c).eff.spr).toBe(6);
+  });
+});
+
+describe("«Вжити» as numbers", () => {
+  it("old fixed actions in a stored catalogue or sheet become numbers", () => {
+    const cat = readCatalog({ items: [{ n: "Антирад", fx: "antirad" }, { n: "Горілка", fx: "vodka" }, { n: "Наукова", fx: "sci", uses: 3 }, { n: "Хліб", fx: "nonsense" }] })!;
+    expect(cat.items.map(m => m.fx)).toEqual([{ rad: -250 }, { rad: -100, vodka: 1 }, { rad: -250 }, undefined]);
+    const c = migrate({ items: [{ id: "v", name: "Горілка", qty: 1, w: 0.5, note: "", fx: "vodka" }, { id: "b", name: "Хліб", qty: 1, w: 0.5, note: "" }] });
+    expect(c.items[0].fx).toEqual({ rad: -100, vodka: 1 });
+    expect("fx" in c.items[1]).toBe(false);
+  });
+
+  it("applies every number, takes one off the count or one use off a kit", () => {
+    const c = simka(); c.rad = 120; c.hp = 10;
+    addMarketItem(c, { g: "Різне", n: "Сира вода", w: 1, p: 0, fx: { rad: 30, hp: 2 } });
+    expect(useItem(c, c.items[0].id)).toBe("Сира вода: +30 рад, +2 ОЗ.");
+    expect([c.rad, c.hp, c.items[0].qty]).toEqual([150, 12, 0]);
+    expect(useItem(c, c.items[0].id)).toBe("");
+    addMarketItem(c, MARKET.find(m => m.n === "Наукова аптечка")!);
+    expect(useItem(c, c.items[1].id)).toBe("Наукова аптечка: −250 рад, одне використання.");
+    expect([c.rad, c.items[1].qty, c.items[1].uses]).toEqual([0, 1, 2]);
+    addMarketItem(c, { g: "Різне", n: "Протверезник", w: 0, p: 0, fx: { vodka: -2 } });
+    c.vodka = 1;
+    useItem(c, c.items[2].id);
+    expect(c.vodka).toBe(0);
   });
 });

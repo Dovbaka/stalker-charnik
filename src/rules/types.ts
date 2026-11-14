@@ -6,7 +6,9 @@ export type SkillKey =
   | "medicine" | "repair" | "scavenge" | "science"
   | "athletics" | "survival" | "sleight" | "stealth";
 
-export type ItemEffect = "antirad" | "vodka" | "sci";
+/** What «Вжити» changes: radiation (+ gets, − draws out), alcohol in portions, health. */
+export type ItemFxKey = "rad" | "vodka" | "hp";
+export type ItemFx = Partial<Record<ItemFxKey, number>>;
 
 export interface Item {
   id: string;
@@ -18,7 +20,8 @@ export interface Item {
   /** uses left in the opened kit (first-aid kits, MRE) */
   uses?: number;
   max?: number;
-  fx?: ItemEffect;
+  /** what «Вжити» does; one press takes one off the count, or one use off a kit */
+  fx?: ItemFx;
   ammo?: boolean;
   cal?: string;
 }
