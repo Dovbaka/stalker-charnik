@@ -54,7 +54,7 @@ export function App() {
         finish={() => {
           const id = camp.create(finishDraft(draft));
           setDraft(null);
-          if (id) { open(id); toast("Картку створено. Бонуси від майстра додай через «Правити»."); } else go("roster");
+          if (id) { open(id); toast("Картку створено."); } else go("roster");
         }}
       />
     );

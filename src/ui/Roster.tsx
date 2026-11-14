@@ -25,7 +25,7 @@ export function Roster({ open, hasDraft, startWizard }: { open: (id: string) => 
   };
   const copyCode = () => {
     if (!exp?.code) return;
-    const fail = () => { codeBox.current?.focus(); codeBox.current?.select(); toast("Скопіювати не вдалося. Код виділено: скопіюй вручну."); };
+    const fail = () => { codeBox.current?.focus(); codeBox.current?.select(); toast("Не скопіювалося. Код виділено."); };
     try { navigator.clipboard.writeText(exp.code).then(() => toast("Код скопійовано."), fail); } catch { fail(); }
   };
   const saveFile = async () => {
@@ -41,7 +41,7 @@ export function Roster({ open, hasDraft, startWizard }: { open: (id: string) => 
   };
   const doImport = async () => {
     const txt = imp.trim();
-    if (!txt) { toast("Встав код або вибери файл."); return; }
+    if (!txt) { toast("Коду немає."); return; }
     let obj: unknown;
     try { obj = txt[0] === "{" ? JSON.parse(txt) : await decode(txt); }
     catch (err) { toast((err as Error)?.message === "old" ? "Цей браузер не вміє читати стиснутий код. Онови браузер." : "Код не читається. Перевір, що він скопійований повністю."); return; }
@@ -55,7 +55,7 @@ export function Roster({ open, hasDraft, startWizard }: { open: (id: string) => 
   const readFile = (file: File | undefined) => {
     if (!file) return;
     const rd = new FileReader();
-    rd.onload = () => { setImp(String(rd.result || "")); toast("Файл прочитано. Натисни «Створити з коду»."); };
+    rd.onload = () => { setImp(String(rd.result || "")); toast("Файл прочитано."); };
     rd.onerror = () => toast("Файл не читається.");
     rd.readAsText(file);
   };

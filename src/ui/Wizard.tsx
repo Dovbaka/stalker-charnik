@@ -13,13 +13,13 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
 
   const go = (n: number) => {
     const target = Math.max(0, Math.min(4, n));
-    if (target > 0 && !d.id.callsign.trim()) { change(x => { x.step = 0; }); toast("Спершу впиши позивний."); return; }
+    if (target > 0 && !d.id.callsign.trim()) { change(x => { x.step = 0; }); toast("Потрібен позивний."); return; }
     change(x => { x.step = target; });
     window.scrollTo(0, 0);
   };
   const tryCancel = () => {
     const touched = d.id.callsign.trim() || attrLeft(d) < ATTR_PTS - 5 || skillLeft(d) < SKILL_PTS;
-    if (touched && !sureCancel) { setSureCancel(true); toast("Чернетку буде видалено. Натисни ще раз, щоб скасувати створення."); return; }
+    if (touched && !sureCancel) { setSureCancel(true); return; }
     cancel();
   };
   const tryFinish = () => { if (!d.id.callsign.trim()) { go(0); return; } finish(); };
@@ -32,7 +32,7 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
     body = <>
       <h2>Хто йде в Зону</h2>
       <div className="pad">
-        <p className="hint">Обов'язковий тільки позивний. Решту можна дописати вже в картці.</p>
+        <p className="hint">Обов'язковий лише позивний.</p>
         <div className="fgrid">
           <Lab name="Позивний"><Text value={d.id.callsign} set={v => change(x => { x.d.id.callsign = v; })} placeholder="Як звуть у Зоні" /></Lab>
           <Lab name="Ім'я"><Text value={d.id.name} set={v => change(x => { x.d.id.name = v; })} placeholder="Необов'язково" /></Lab>
@@ -106,7 +106,7 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
       <h2>Закупись на 4000 купонів</h2>
       <div>
         <div className="pad">
-          <p className="hint">Шкіряна куртка, одяг і ПДА є в кожного, вони безкоштовні й ваги не мають. Невитрачені купони лишаються в кишені. Гвинтівок у списку майстра немає: свою зброю можна вписати вже в картці.</p>
+          <p className="hint">Шкіряна куртка, одяг і ПДА є в кожного й ваги не мають. Невитрачені купони лишаються.</p>
           <div className="prot four">
             <div><b>{fmt(moneyLeft)}</b><span>Купонів</span></div><div><b className={t.weight > cap ? "neg" : ""}>{kg(t.weight)}</b><span>Вага, кг</span></div>
             <div><b>{cap}</b><span>Без штрафу</span></div><div><b>{kg(cap * 1.5)}</b><span>Межа</span></div>
@@ -129,14 +129,13 @@ export function Wizard({ draft: w, change, cancel, finish }: { draft: Draft; cha
       <h2>Перевір і створи</h2>
       <div className="pad">
         <div className="sum"><div className="lbl">Сталкер</div><p><b>{d.id.callsign}</b>{d.id.role ? ", " + d.id.role : ""}{d.id.age ? `, ${d.id.age} р.` : ""}</p>
-          <p className="hint">Пул удачі: {num(d.luck.pool) || "не вписано, можна пізніше"}</p></div>
+          <p className="hint">Пул удачі: {num(d.luck.pool)}</p></div>
         <div className="sum"><div className="lbl">Характеристики</div><p className="num">{ATTRS.map(a => `${a.name} ${d.attrs[a.key]}`).join(", ")}</p>
           {aLeft > 0 && <p className="amber">Не розподілено {aLeft} б. Вони збережуться як вільні бали.</p>}</div>
         <div className="sum"><div className="lbl">Навички</div><p className="num">{skills}</p>
           {sLeft > 0 && <p className="amber">Не розподілено {sLeft} б. Вони збережуться як вільні бали.</p>}</div>
         <div className="sum"><div className="lbl">Спорядження</div><p>{gear}</p><p className="hint num">Лишається {fmt(moneyLeft)} куп., вага {kg(t.weight)} з {cap} кг.</p></div>
         {w.ab.name.trim() && <div className="sum"><div className="lbl">Здібність</div><p><b>{w.ab.name}</b>{w.ab.text ? ". " + w.ab.text : ""}</p></div>}
-        <p className="hint">Після створення все можна змінити через кнопку «Правити». Бонуси від майстра додаються там само.</p>
       </div>
     </>;
   }

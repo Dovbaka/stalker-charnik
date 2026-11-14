@@ -71,6 +71,27 @@ export function Check({ checked, set, children, wide, disabled }: { checked: boo
 export function Tg({ on, onClick, mod, children, disabled }: { on: boolean; onClick: () => void; mod?: string; children: ReactNode; disabled?: boolean }) {
   return <button type="button" className={cx("tg", on && "on")} aria-pressed={on} disabled={disabled} onClick={onClick}>{children}{mod ? <i>{mod}</i> : null}</button>;
 }
+/**
+ * A big number that turns into a field when tapped, so a value can be typed in directly (0..max).
+ * The field takes the number's place and size: nothing around it moves.
+ */
+export function EditNum({ value, min = 0, max, set, label, className, suffix }: { value: number; min?: number; max: number; set: (v: number) => void; label: string; className?: string; suffix?: ReactNode }) {
+  const [raw, setRaw] = useState<string | null>(null);
+  const commit = () => {
+    if (raw != null && raw.trim() !== "") set(clamp(Math.round(num(raw, value)), min, max));
+    setRaw(null);
+  };
+  return (
+    <span className={cx("big editnum", className)}>
+      {raw == null
+        ? <button type="button" aria-label={`${label}: ${value}. Змінити`} title={label} onClick={() => setRaw(String(value))}>{value}</button>
+        : <input autoFocus inputMode="numeric" aria-label={label} value={raw} onChange={e => setRaw(e.target.value)} onBlur={commit}
+            onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setRaw(null); }} onFocus={e => e.target.select()} />}
+      {suffix}
+    </span>
+  );
+}
+
 /** A destructive button that asks once more before it acts. */
 export function Confirm({ onConfirm, label = "×", ask = "Видалити?", title = "Видалити", sm = true }: { onConfirm: () => void; label?: string; ask?: string; title?: string; sm?: boolean }) {
   const [armed, setArmed] = useState(false);

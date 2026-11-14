@@ -8,7 +8,11 @@ import type { SheetApi } from "../Sheet";
 
 /** Everything the character owns: coupons, the load, weapons, armour, items, artefacts. */
 export function PackTab(api: SheetApi) {
-  return <><MoneyBox {...api} /><WeaponsBox {...api} /><ArmorsBox {...api} /><ItemsBox {...api} /><ArtifactsBox {...api} /></>;
+  return <>
+    <div className="col"><MoneyBox {...api} /></div>
+    <div className="col"><WeaponsBox {...api} /><ArmorsBox {...api} /></div>
+    <div className="col"><ItemsBox {...api} /><ArtifactsBox {...api} /></div>
+  </>;
 }
 
 /** Coupons and the load share a box: both answer "can I take this". */
@@ -16,7 +20,7 @@ function MoneyBox({ c, d, ro, up }: SheetApi) {
   const [amt, setAmt] = useState("");
   const move = (dir: 1 | -1) => {
     const n = Math.round(num(amt, NaN));
-    if (!(n > 0)) { toast("Впиши суму."); return; }
+    if (!(n > 0)) { toast("Немає суми."); return; }
     if (dir < 0 && n > c.money) { toast("Стільки купонів немає."); return; }
     up(x => { x.money += n * dir; });
     setAmt("");
@@ -48,6 +52,7 @@ function MoneyBox({ c, d, ro, up }: SheetApi) {
 /** Every weapon owned. "На собі" marks the ones carried ready; those appear in «Бій». */
 function WeaponsBox({ c, ro, edit, up }: SheetApi) {
   const [adding, setAdding] = useState(false);
+  const [modsOf, setModsOf] = useState("");
   const [pick, setPick] = useState("");
   const [buy, setBuy] = useState(false);
   const add = () => {
@@ -58,7 +63,6 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
     }
     up(x => { if (g && buy) x.money -= g.p; addGun(x, g); });
     setAdding(false);
-    if (!g) toast("Назву, шкоду й магазин впиши через «Правити».");
   };
   return (
     <Box title="Зброя" ro={ro} right={!ro && !adding ? <Btn sm onClick={() => setAdding(true)}>+ Додати</Btn> : undefined}>
@@ -75,8 +79,12 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
                 </div>
                 <span className="iw num">{kg(num(g.w))} кг</span>
               </div>
-              {g.mods.length > 0 && !edit && <div className="chips">{g.mods.map(md => <span key={md.id} className="chip">{md.name}</span>)}</div>}
-              <Check checked={g.on} set={v => up(x => { x.weapons[i].on = v; })}>На собі</Check>
+              {g.mods.length > 0 && modsOf !== g.id && <div className="chips">{g.mods.map(md => <span key={md.id} className="chip">{md.name}</span>)}</div>}
+              <div className="row between">
+                <Check checked={g.on} set={v => up(x => { x.weapons[i].on = v; })}>На собі</Check>
+                {!ro && <Btn sm pri={modsOf === g.id} onClick={() => setModsOf(modsOf === g.id ? "" : g.id)}>{modsOf === g.id ? "Готово" : "Модифікації"}</Btn>}
+              </div>
+              {modsOf === g.id && <ModsEditor {...{ c, up, i }} />}
               {edit && <WeaponEdit {...{ c, up, i }} />}
             </div>
           );
@@ -98,14 +106,9 @@ function WeaponsBox({ c, ro, edit, up }: SheetApi) {
   );
 }
 
-/** A weapon's own numbers and its attachments, in «Правити». */
+/** A weapon's own numbers, in «Правити». */
 function WeaponEdit({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
   const g = c.weapons[i];
-  const [preset, setPreset] = useState("0");
-  const addMod = () => {
-    const p = preset === "own" ? { name: "Модифікація", kind: "other" as const, bonus: 0 } : MOD_PRESETS[Number(preset)];
-    if (p) up(x => { x.weapons[i].mods.push(newMod(p)); });
-  };
   return <>
     <div className="fgrid">
       <Lab name="Назва" wide><Text value={g.name} set={v => up(x => { x.weapons[i].name = v; })} /></Lab>
@@ -118,7 +121,20 @@ function WeaponEdit({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
       <Lab name="Нотатка" wide><Text value={g.note} set={v => up(x => { x.weapons[i].note = v; })} /></Lab>
       <Check wide checked={g.nato} set={v => up(x => { x.weapons[i].nato = v; })}>Зброя НАТО, +1 до влучання</Check>
     </div>
-    <div className="lbl">Модифікації</div>
+    <div><Confirm sm={false} label="Викинути зброю" ask="Точно викинути?" title="Викинути зброю" onConfirm={() => up(x => { x.weapons.splice(i, 1); })} /></div>
+  </>;
+}
+
+/** Attachments of one weapon: add from the list or your own, set the GM's bonus, take off. */
+function ModsEditor({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
+  const g = c.weapons[i];
+  const [preset, setPreset] = useState("0");
+  const addMod = () => {
+    const p = preset === "own" ? { name: "Модифікація", kind: "other" as const, bonus: 0 } : MOD_PRESETS[Number(preset)];
+    if (p) up(x => { x.weapons[i].mods.push(newMod(p)); });
+  };
+  return <div className="modsed">
+    {g.mods.length === 0 && <span className="hint">Модифікацій немає.</span>}
     {g.mods.map((md, j) => (
       <div className="edrow" key={md.id} style={{ paddingTop: 0 }}>
         {md.kind === "other" ? <Text value={md.name} label="Назва модифікації" set={v => up(x => { x.weapons[i].mods[j].name = v; })} className="grow" /> : <b>{md.name}</b>}
@@ -134,8 +150,7 @@ function WeaponEdit({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
       </select>
       <Btn onClick={addMod}>Додати</Btn>
     </div>
-    <div><Confirm sm={false} label="Викинути зброю" ask="Точно викинути?" title="Викинути зброю" onConfirm={() => up(x => { x.weapons.splice(i, 1); })} /></div>
-  </>;
+  </div>;
 }
 
 /** Every armour owned. Only one can be worn; its numbers protect in «Бій». */
@@ -187,7 +202,7 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
   };
   const addOwn = () => {
     const n = name.trim();
-    if (!n) { toast("Впиши назву речі."); return; }
+    if (!n) { toast("Немає назви."); return; }
     up(x => { x.items.push({ id: uid(), name: n, qty: Math.max(1, Math.round(num(qty, 1))), w: Math.max(0, num(weight, 0)), note: "" }); });
     setName(""); setQty(""); setWeight("");
   };
@@ -253,7 +268,7 @@ function ArtifactsBox({ c, ro, edit, up }: SheetApi) {
   }
   const add = () => {
     const n = name.trim();
-    if (!n) { toast("Впиши назву артефакту."); return; }
+    if (!n) { toast("Немає назви."); return; }
     up(x => { x.artifacts.push({ id: uid(), name: n, fx: fx.trim() }); });
     setName(""); setFx(""); setAdding(false);
   };

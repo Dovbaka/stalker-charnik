@@ -4,7 +4,11 @@ import { Area, Box, Lab, Text } from "../bits";
 import type { SheetApi } from "../Sheet";
 
 export function NotesTab(api: SheetApi) {
-  return <><NotesBox {...api} />{!api.ro && <SecretBox {...api} />}<AboutBox {...api} /><RulesBox /></>;
+  return <>
+    <div className="col"><NotesBox {...api} />{!api.ro && <SecretBox {...api} />}</div>
+    <div className="col"><AboutBox {...api} /></div>
+    <div className="col"><RulesBox /></div>
+  </>;
 }
 
 function NotesBox({ c, ro, up }: SheetApi) {
@@ -86,7 +90,7 @@ function RulesBox() {
           <summary>Лікування</summary>
           <div className="body"><ul>
             <li>1 ОЗ відновлюється за 2 години, у спокої з доглядом за годину, у небезпеці за 4.</li>
-            <li>Перша допомога: к10 + Медицина проти 5, 9, 13 або 17 за кількістю ран. У підсумку правил стоять 14 і 18, уточни в майстра.</li>
+            <li>Перша допомога: к10 + Медицина проти 5, 9, 13 або 17 за кількістю ран.</li>
             <li>Бинт +2 проти кровотечі, аптечка +4, армійська й наукова +8.</li>
             <li>Зупинити кровотечу: Медицина проти 4, додаткова дія.</li>
           </ul></div>

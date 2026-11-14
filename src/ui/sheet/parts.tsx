@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { LUCK_COST, setHp, setLuckPool, spendLuck, takeDamage, worn, type DamageType, type LuckUse } from "../../rules/character";
 import { num } from "../../util";
-import { Box, Btn, Check, Dots, KV, Meter, Stepper, toast } from "../bits";
+import { Box, Btn, Check, Dots, EditNum, KV, Meter, Stepper, toast } from "../bits";
 import type { SheetApi } from "../Sheet";
 
 /** Faint colour bands behind the health bar, so the next colour step can be seen before it is reached. */
@@ -62,11 +62,14 @@ export function HealthBox({ c, d, ro, up, combat }: SheetApi & { combat?: boolea
   );
 }
 
-const USES: [LuckUse, string, string][] = [["bonus", "+1 / −1", "+1 до своєї перевірки або −1 ворогу"], ["reroll", "Перекид", "перекинути к10, свій чи ворожий"], ["auto", "Автоуспіх", "автоуспіх або автопровал ворога"]];
-const SPENT: Record<LuckUse, string> = { bonus: "+1 / −1", reroll: "перекид", auto: "автоуспіх" };
+const USES: [LuckUse, string, string][] = [["bonus", "+1 до кидка", "+1 до своєї перевірки або −1 ворогу"], ["reroll", "Перекид", "перекинути к10, свій чи ворожий"], ["auto", "Автоуспіх", "автоуспіх або автопровал ворога"]];
+const SPENT: Record<LuckUse, string> = { bonus: "+1 до кидка", reroll: "перекид", auto: "автоуспіх" };
 
-/** Spend luck on its three uses; on the card the pool can be set too. It comes back through «Відпочити». */
-export function LuckControls({ c, ro, up, pool: showPool }: SheetApi & { pool?: boolean }) {
+/**
+ * Spend luck on its three uses. The number itself can be typed over (0..pool) to undo a slip.
+ * The pool changes only in «Правити»; luck comes back through «Відпочити».
+ */
+export function LuckControls({ c, ro, edit, up }: SheetApi) {
   const cur = num(c.luck.cur), pool = num(c.luck.pool);
   const spend = (use: LuckUse) => {
     let ok = false;
@@ -76,7 +79,7 @@ export function LuckControls({ c, ro, up, pool: showPool }: SheetApi & { pool?: 
   return (
     <div className="pad">
       <div className="row between">
-        <span className="big">{cur}<small>/{pool}</small></span>
+        <EditNum value={cur} max={pool} label="Удача зараз" set={v => up(x => { x.luck.cur = v; })} suffix={<small>/{pool}</small>} />
         {pool > 0 && pool <= 12 && <Dots cls="pips" on={cur} of={pool} />}
       </div>
       <div className="luckbtns">
@@ -86,7 +89,7 @@ export function LuckControls({ c, ro, up, pool: showPool }: SheetApi & { pool?: 
           </button>
         ))}
       </div>
-      {showPool && !ro && <KV k="Пул удачі"><Stepper value={pool} min={0} max={99} set={v => up(x => { const was = num(x.luck.pool); setLuckPool(x, v); if (v > was) x.luck.cur = num(x.luck.cur) + (v - was); })} /></KV>}
+      {edit && !ro && <KV k="Пул удачі"><Stepper value={pool} min={0} max={99} set={v => up(x => { const was = num(x.luck.pool); setLuckPool(x, v); if (v > was) x.luck.cur = num(x.luck.cur) + (v - was); })} /></KV>}
     </div>
   );
 }

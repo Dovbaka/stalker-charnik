@@ -71,8 +71,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 /* ---------- boxes ---------- */
-.grid { columns: 3 330px; column-gap: 14px; padding-top: 14px; }
-.grid > * { break-inside: avoid; margin: 0 0 14px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 14px; align-items: start; padding-top: 14px; }
+.col { display: grid; gap: 14px; align-content: start; min-width: 0; }
 .stack { display: grid; gap: 8px; }
 .box { border: 1px solid var(--line); background: var(--box); min-width: 0; }
 .box > h2 { font: 500 12px/1.2 var(--font-d); text-transform: uppercase; letter-spacing: .1em; color: var(--soft); padding: 7px 12px 6px; background: var(--head); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 31px; }
@@ -134,15 +134,19 @@ textarea.in { display: block; resize: vertical; line-height: 1.45; }
 
 /* ---------- health ---------- */
 .hprow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.hpctl { display: flex; align-items: center; gap: 6px; }
+.hpctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.editnum { display: inline-flex; align-items: baseline; }
+.editnum button { appearance: none; border: 0; border-bottom: 1px dashed var(--line); background: transparent; color: inherit; font: inherit; padding: 0; cursor: text; min-width: 1.4em; text-align: left; }
+.editnum input { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--olive); border-radius: 2px; width: 3.2em; padding: 0 4px; line-height: 1; height: 1.1em; }
 .luckbtns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .luckbtns .btn { min-height: 54px; padding: 6px 4px; display: grid; place-items: center; gap: 3px; white-space: normal; font-size: 14px; }
 .luckbtns .btn small { font-size: 11px; color: var(--soft); }
 .grow { flex: 1 1 10em; }
+.modsed { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); }
 .overlay { position: fixed; inset: 0; z-index: 30; background: rgba(8, 10, 6, .72); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .dialog { width: min(100%, 480px); margin-block: auto; outline: none; }
 .dialog > h2 { position: sticky; top: 0; z-index: 1; }
-.hpctl select.in { flex: 1 1 8em; }
+.hpctl select.in { flex: 1 1 100%; }
 .hpctl .in.w4 { width: 4.2em; }
 .chk.off { opacity: .4; cursor: default; }
 .hpnum { font: 400 44px/1 var(--font-m); font-variant-numeric: tabular-nums; }

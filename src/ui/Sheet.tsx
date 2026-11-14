@@ -70,7 +70,7 @@ export function Sheet({ id, menu }: { id: string; menu: () => void }) {
         </div>
       </header>
       <nav className="tabs toptabs" aria-label="Розділи">{tabs}</nav>
-      <main className="grid">
+      <main className="cols">
         {current === "sheet" && <CardTab {...api} />}
         {current === "combat" && <CombatTab {...api} />}
         {current === "pack" && <PackTab {...api} />}

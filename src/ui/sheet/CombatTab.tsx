@@ -8,11 +8,12 @@ import { HealthBox, LuckControls } from "./parts";
 
 export function CombatTab(api: SheetApi) {
   return <>
-    <HealthBox {...api} combat />
-    {num(api.c.luck.pool) > 0 && <Box title="Удача" ro={api.ro}><LuckControls {...api} /></Box>}
-    <ShotBox {...api} />
-    <GunsBox {...api} />
-    <ArmorBox {...api} />
+    <div className="col">
+      <HealthBox {...api} combat />
+      {num(api.c.luck.pool) > 0 && <Box title="Удача" ro={api.ro}><LuckControls {...api} /></Box>}
+    </div>
+    <div className="col"><ShotBox {...api} /></div>
+    <div className="col"><GunsBox {...api} /><ArmorBox {...api} /></div>
   </>;
 }
 
@@ -116,7 +117,7 @@ function GunsBox({ c, ro, up }: SheetApi) {
   return (
     <Box title="Зброя на собі" ro={ro}>
       <div>
-        {guns.length === 0 && <p className="empty">Зброї на собі немає. Її беруть у «Рюкзаку».</p>}
+        {guns.length === 0 && <p className="empty">Зброї на собі немає.</p>}
         {guns.map(({ g, i }) => {
           const mag = num(g.mag), cur = clamp(num(g.cur), 0, mag), jams = num(g.jams);
           const meta = [g.dmg, g.cal, g.nato ? "НАТО +1" : ""].filter(Boolean).join(" · ");
@@ -152,7 +153,7 @@ function ArmorBox({ c, ro, up }: SheetApi) {
     <Box title="Броня" ro={ro}>
       <div className="pad">
         {a ? <><b>{a.name}</b><div className="prot">{tiles.map(t => <div key={t[0]}><b>{num(t[1])}</b><span>{t[0]}</span></div>)}</div></>
-          : <span className="hint">Броню не надіто. Її надягають у «Рюкзаку».</span>}
+          : <span className="hint">Броню не надіто.</span>}
         <Check checked={c.mask} set={v => up(x => { x.mask = v; })}>Протигаз: +5 від радіації, −1 до влучання</Check>
       </div>
     </Box>
