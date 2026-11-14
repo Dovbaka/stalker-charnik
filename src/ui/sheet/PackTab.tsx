@@ -279,8 +279,11 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
               {it.fx && <Btn sm pri disabled={q <= 0} onClick={() => { let msg = ""; const undo = up(x => { msg = useItem(x, it.id); }); if (msg) toast(msg, undo); }}>Вжити</Btn>}
               {it.uses != null && !it.fx && <Btn sm disabled={q <= 0} onClick={() => toast(`${it.name}: одне використання.`, up(x => useCharge(x.items[i])))}>Використати</Btn>}
               <Stepper value={q} min={0} max={9999} set={v => up(x => { x.items[i].qty = v; })} />
-              <span className="iw num">{kg(q * num(it.w))} кг</span>
-              {!ro && !edit && <Btn sm pri={isOpen} onClick={() => setOpen(isOpen ? "" : it.id)}>{isOpen ? "Готово" : "Змінити"}</Btn>}
+              {/* weight and «Змінити» keep to the right edge, also when they wrap to a line of their own */}
+              <span className="iend">
+                <span className="iw num">{kg(q * num(it.w))} кг</span>
+                {!ro && !edit && <Btn sm pri={isOpen} onClick={() => setOpen(isOpen ? "" : it.id)}>{isOpen ? "Готово" : "Змінити"}</Btn>}
+              </span>
               {(edit || isOpen) && (
                 <div className="fgrid" style={{ flex: "1 1 100%" }}>
                   <Lab name="Назва"><Text value={it.name} set={v => up(x => { x.items[i].name = v; })} /></Lab>
