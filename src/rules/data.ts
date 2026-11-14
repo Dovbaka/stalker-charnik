@@ -119,7 +119,7 @@ export const GUNS: GunEntry[] = [
   { n: "ПБ-1с", g: "Пістолети", skill: "pistols", range: "Коротка", mag: 8, dmg: "к10", modes: "напівавтомат", w: 0.5, cal: "9×18", p: 1000, note: "", mods: ["silencer"] },
   { n: "Walker P99", g: "Пістолети", skill: "pistols", range: "Коротка", mag: 16, dmg: "к10+1", modes: "напівавтомат", w: 0.5, cal: "9×19", p: 2000, nato: true, note: "", mods: ["grip"] },
   { n: "MP-5", g: "Гвинтівки", skill: "rifles", range: "Коротка", mag: 30, dmg: "к10+1", modes: "напівавтомат, автомат, по 3", w: 2.5, cal: "9×19", p: 3000, nato: true, note: "" },
-  { n: "Обріз", g: "Дробовики", skill: "rifles", range: "Близька", mag: 2, dmg: "3к10", modes: "одиночний", w: 2, cal: "12×70 дріб", p: 1500, note: SHOT },
+  { n: "Обріз", g: "Дробовики", skill: "rifles", range: "Близька", mag: 2, dmg: "3к10", modes: "одиночний", w: 2, cal: "12×70 дріб", p: 2000, note: SHOT },
   { n: "Ніж", g: "Холодна зброя", skill: "melee", range: "", mag: 0, dmg: "к10", modes: "", w: 0.5, cal: "", p: 1000, note: "На 10 при поцілюванні: +3 шкоди, і вся шкода повз кінетичну броню." },
   { n: "Кастети", g: "Холодна зброя", skill: "unarmed", range: "", mag: 0, dmg: "к10", modes: "", w: 0.5, cal: "", p: 500, note: "" },
   { n: "Шиповані кастети", g: "Холодна зброя", skill: "unarmed", range: "", mag: 0, dmg: "к10", modes: "", w: 0.5, cal: "", p: 800, note: "Може викликати кровотечу." },
