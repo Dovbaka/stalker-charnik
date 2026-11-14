@@ -2,7 +2,7 @@
 
 An electronic character sheet for a friend's homebrew S.T.A.L.K.E.R. tabletop RPG (d10 system, one campaign, about five people). The aim is what D&D Beyond or Pathbuilder give their systems: players track a character by tapping buttons and the sheet applies the rules for them.
 
-- Live site: https://stalker-rpg-101a6.web.app (Firebase Hosting, project `stalker-rpg-101a6`)
+- Live site: https://stalker-rpg-builder.web.app (Firebase Hosting site `stalker-rpg-builder` in project `stalker-rpg-101a6`). The project's default address, stalker-rpg-101a6.web.app, only redirects there (`hosting-redirect/`).
 - Rules source (the GM's document, Ukrainian): https://docs.google.com/document/d/19YPQULpNjHAonbOkKxUPkQemvipYKiMsMmTWzLBPyRo/edit — readable without login with `curl -sL ".../export?format=txt"`
 
 ## Commands
