@@ -1,5 +1,5 @@
 // The GM's rules as data. Source: the rules document of the campaign.
-import type { AttrKey, ItemEffect, SkillKey } from "./types";
+import type { AttrKey, ItemEffect, ModKind, SkillKey } from "./types";
 
 export const ATTR_PTS = 16;
 export const SKILL_PTS = 18;
@@ -78,12 +78,14 @@ export interface GunEntry {
   p: number;
   nato?: boolean;
   note: string;
+  /** attachments it comes with */
+  mods?: ModPreset[];
 }
 export const GUNS: GunEntry[] = [
   { n: "Макаров (ПМм)", skill: "pistols", mag: 8, dmg: "к10", modes: "напівавтомат", w: 0.5, cal: "9×18", p: 500, note: "Коротка дистанція. Кожна 1 на к10 рахується за дві." },
   { n: "Стєчкін (АПС)", skill: "pistols", mag: 20, dmg: "к10", modes: "напівавтомат, автомат", w: 1.5, cal: "9×18", p: 1500, note: "Коротка дистанція." },
   { n: "Фора-12м", skill: "pistols", mag: 12, dmg: "к10", modes: "напівавтомат", w: 0.5, cal: "9×18", p: 1500, note: "Коротка дистанція. Ергономічна рукоятка." },
-  { n: "ПБ-1с", skill: "pistols", mag: 8, dmg: "к10", modes: "напівавтомат", w: 0.5, cal: "9×18", p: 1000, note: "Коротка дистанція. Вбудований глушник." },
+  { n: "ПБ-1с", skill: "pistols", mag: 8, dmg: "к10", modes: "напівавтомат", w: 0.5, cal: "9×18", p: 1000, note: "Коротка дистанція.", mods: [{ name: "Вбудований глушник", kind: "silencer", bonus: 0 }] },
   { n: "Walker P99", skill: "pistols", mag: 16, dmg: "к10+1", modes: "напівавтомат", w: 0.5, cal: "9×19", p: 2000, nato: true, note: "Коротка дистанція. Ергономічна рукоятка." },
   { n: "MP-5", skill: "rifles", mag: 30, dmg: "к10+1", modes: "напівавтомат, автомат, по 3", w: 2.5, cal: "9×19", p: 2500, nato: true, note: "Коротка дистанція. Навичку уточни в майстра." },
   { n: "Обріз", skill: "rifles", mag: 2, dmg: "3к10", modes: "одиночний", w: 2, cal: "12×70 дріб", p: 2000, note: "Близька дистанція. Ігнорує 5 кінетичної броні зблизька і 3 на короткій. Навичку уточни в майстра." },
@@ -91,6 +93,27 @@ export const GUNS: GunEntry[] = [
   { n: "Кастети", skill: "unarmed", mag: 0, dmg: "к10", modes: "", w: 0.5, cal: "", p: 500, note: "" },
   { n: "Шиповані кастети", skill: "unarmed", mag: 0, dmg: "к10", modes: "", w: 0.5, cal: "", p: 800, note: "Може викликати кровотечу." },
 ];
+/** Attachments offered when one is added to a weapon. Bonuses of "other" are 0 until the GM sets them. */
+export interface ModPreset { name: string; kind: ModKind; bonus: number }
+export const MOD_PRESETS: ModPreset[] = [
+  { name: "Оптичний приціл", kind: "optic", bonus: 1 },
+  { name: "Коліматор", kind: "colim", bonus: 1 },
+  { name: "Глушник", kind: "silencer", bonus: 0 },
+  { name: "Лазерний цілевказівник", kind: "other", bonus: 0 },
+  { name: "Сошки", kind: "other", bonus: 0 },
+  { name: "Ергономічна рукоятка", kind: "other", bonus: 0 },
+];
+export const MOD_KIND_NOTE: Record<ModKind, string> = {
+  optic: "+1 на 50 м і далі",
+  colim: "+1 до 50 м",
+  silencer: "постріл тихіший",
+  other: "",
+};
+
+/** Food and water the rest window can take from the backpack, by item name: rations per unit. */
+export const FOOD: Record<string, number> = { "Сніданок туриста": 1, "MRE": 1, "Хліб": 0.5, "Ковбаса": 0.5 };
+export const WATER = "Вода, 1 л";
+
 /** what "Своя зброя" starts from */
 export const CUSTOM_GUN: GunEntry = { n: "Нова зброя", skill: "rifles", mag: 10, dmg: "", modes: "", w: 4, cal: "7.62×54", p: 0, note: "" };
 

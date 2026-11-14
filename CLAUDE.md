@@ -50,6 +50,9 @@ npm run deploy       # build, then publish the site and firestore.rules (needs `
 - Nothing may appear, disappear or change height when a number changes: reserve the space (show a control disabled, hide text with `visibility`). Height may change only when the person adds or opens something.
 - Health is changed by any amount on every tab: a field (empty means 1) with − and +. In combat − goes through the chosen armour.
 - Multi-shot fire follows the rules document: semi-automatic 2 shots without penalty, burst of three −1 on the 2nd and 3rd, automatic −1, −2, −3, −4 on shots 2–5. The owner remembered "−1 more for every shot" for all multi-shot weapons; if the GM confirms that, change `FIRE_MODES` in `rules/character.ts`.
+- Luck, health, sleep, food, water, radiation and alcohol come back through one «Відпочити» window in the header (`rules/rest.ts`): it asks the conditions, shows what will change, applies on confirm. No separate dawn buttons.
+- «Рюкзак» holds everything owned: weapons with an «На собі» flag (any number), armours with «Надіта» (one at a time). «Бій» shows only what is on the body.
+- Weapon attachments (`Weapon.mods`): a scope or collimator carries the rules' +1 and is offered in the calculator only for a weapon that has it; "other" attachments carry a GM-set bonus and show only when it is not 0.
 - Done in that pass: luck (pool typed in the wizard, may stay 0; spend 1/3/5; +2 at dawn, +3 in safety, never above the pool; +1 per point and luck rerolls in the shot calculator).
 
 ## Roadmap (agreed with the owner, in this order)

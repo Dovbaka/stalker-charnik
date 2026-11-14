@@ -3,7 +3,7 @@ import { ATTRS, RAD_FX, RAD_STAGE, REROLL_OPTIONS, SKILL_GROUPS, SKILL_KEYS } fr
 import { maxHp } from "../../rules/character";
 import type { AttrKey, RerollSkill } from "../../rules/types";
 import { clamp, cx, num, uid } from "../../util";
-import { Area, Box, Btn, Confirm, Dots, Lab, Meter, Stepper, Text } from "../bits";
+import { Area, Box, Btn, Confirm, Dots, KV, Lab, Meter, Stepper, Text } from "../bits";
 import type { SheetApi } from "../Sheet";
 import { HealthBox, LuckControls } from "./parts";
 
@@ -14,8 +14,9 @@ export function CardTab(api: SheetApi) {
 /** Health, then three quick numbers. Radiation and luck open their controls under the row. */
 function Vitals(api: SheetApi) {
   const { c, d, ro, up } = api;
-  const [open, setOpen] = useState<"" | "rad" | "luck">("");
-  const toggle = (k: "rad" | "luck") => setOpen(open === k ? "" : k);
+  const [open, setOpen] = useState<"" | "rad" | "luck" | "move">("");
+  const toggle = (k: "rad" | "luck" | "move") => setOpen(open === k ? "" : k);
+  const spr = d.eff.spr, move = 3 + spr;
   const rad = (delta: number) => up(x => { x.rad = clamp(x.rad + delta, 0, 1000); });
   const pool = num(c.luck.pool), cur = num(c.luck.cur);
   return (
@@ -31,10 +32,10 @@ function Vitals(api: SheetApi) {
           <span className="v">{cur}<small>/{pool}</small></span>
           {pool > 0 && pool <= 12 && <Dots cls="pips" on={cur} of={pool} />}
         </button>
-        <div className="cell">
+        <button type="button" className={cx("cell", open === "move" && "on")} aria-expanded={open === "move"} onClick={() => toggle("move")}>
           <span className="lbl">Хід</span>
-          <span className="v">{3 + d.eff.spr}<small> м</small></span>
-        </div>
+          <span className={cx("v", spr < num(c.attrs.spr) && "neg")}>{move}<small> м</small></span>
+        </button>
       </div>
       {open === "rad" && (
         <Box title="Радіація" ro={ro}>
@@ -47,7 +48,19 @@ function Vitals(api: SheetApi) {
           </div>
         </Box>
       )}
-      {open === "luck" && <Box title="Удача" ro={ro}><LuckControls {...api} /></Box>}
+      {open === "luck" && <Box title="Удача" ro={ro}><LuckControls {...api} pool /></Box>}
+      {open === "move" && (
+        <Box title="Хід">
+          <div className="pad">
+            <KV k="Рух · додаткова дія"><span className="num">{move} м</span></KV>
+            <KV k="Ривок · основна дія"><span className="num">{move * 2} м</span></KV>
+            <KV k="Повзком, лазіння · додаткова"><span className="num">{spr} м</span></KV>
+            <div className="hint">Подорож: 5 км/год, бігом 12. Важкий терен, аномалії, ніч чи потай: удвічі довше.</div>
+            {spr < num(c.attrs.spr) && <div className="neg">Спритність знижена: {num(c.attrs.spr)} → {spr}.</div>}
+            <div className="hint">У правилах для повзання є й інше число, (3 + Спритність) / 3 = {String(Math.round(((3 + spr) / 3) * 10) / 10).replace(".", ",")} м. Уточни в майстра.</div>
+          </div>
+        </Box>
+      )}
     </div>
   );
 }

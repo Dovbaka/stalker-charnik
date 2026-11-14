@@ -1,16 +1,15 @@
-import { useState, type ReactNode } from "react";
-import { GUNS, SKILL_NAME, WEAPON_SKILLS } from "../../rules/data";
-import { FIRE_MODES, SHOT0, addGun, rangedWeapons, reload, resolveShot, shotCalc, weaponModes, type ShotOpts } from "../../rules/character";
-import type { SkillKey } from "../../rules/types";
+import type { ReactNode } from "react";
+import { SKILL_NAME } from "../../rules/data";
+import { FIRE_MODES, SHOT0, hasMod, rangedWeapons, reload, resolveShot, shotCalc, weaponModes, worn, type ShotOpts } from "../../rules/character";
 import { clamp, cx, num, sign } from "../../util";
-import { Box, Btn, Check, Confirm, KV, Lab, NumIn, Stepper, Text, Tg, toast, usePersisted } from "../bits";
+import { Box, Btn, Check, KV, Stepper, Tg, toast, usePersisted } from "../bits";
 import type { SheetApi } from "../Sheet";
 import { HealthBox, LuckControls } from "./parts";
 
 export function CombatTab(api: SheetApi) {
   return <>
     <HealthBox {...api} combat />
-    {num(api.c.luck.pool) > 0 && <Box title="Удача" ro={api.ro}><LuckControls {...api} restore={false} /></Box>}
+    {num(api.c.luck.pool) > 0 && <Box title="Удача" ro={api.ro}><LuckControls {...api} /></Box>}
     <ShotBox {...api} />
     <GunsBox {...api} />
     <ArmorBox {...api} />
@@ -36,6 +35,9 @@ function ShotBox({ c, d, ro, up }: SheetApi) {
   const guns = rangedWeapons(c);
   const gun = guns.find(g => g.id === o.weapon);
   const modes = gun ? weaponModes(gun.modes) : FIRE_MODES.map(f => f.key);
+  const canOptic = !gun || hasMod(gun, "optic"), canColim = !gun || hasMod(gun, "colim");
+  const extras = gun ? gun.mods.filter(md => md.kind === "other" && num(md.bonus) !== 0) : [];
+  const toggleMod = (id: string) => set({ mods: o.mods.includes(id) ? o.mods.filter(x => x !== id) : [...o.mods, id] });
   const flag = (key: "sit" | "optic" | "colim" | "nato" | "lying" | "tprone" | "vis" | "invis", text: string, mod: string, disabled = false) =>
     <Tg on={o[key] && !disabled} mod={mod} disabled={disabled} onClick={() => set({ [key]: !saved[key] } as Partial<ShotOpts>)}>{text}</Tg>;
 
@@ -91,9 +93,10 @@ function ShotBox({ c, d, ro, up }: SheetApi) {
 
         <Group name="Умови">
           <div className="seg">
-            {flag("optic", "Оптика, від 50 м", "+1")}{flag("colim", "Коліматор, до 50 м", "+1")}
+            {canOptic && flag("optic", "Оптика, від 50 м", "+1")}{canColim && flag("colim", "Коліматор, до 50 м", "+1")}
+            {extras.map(md => <Tg key={md.id} on={o.mods.includes(md.id)} mod={sign(num(md.bonus)).replace(" ", "")} onClick={() => toggleMod(md.id)}>{md.name}</Tg>)}
             {flag("lying", "Стріляю лежачи", "−2")}{flag("vis", "Туман, дощ", "−2")}
-            <Tg on={c.armor.mask} mod="−1" disabled={ro} onClick={() => up(x => { x.armor.mask = !x.armor.mask; })}>Протигаз</Tg>
+            <Tg on={c.mask} mod="−1" disabled={ro} onClick={() => up(x => { x.mask = !x.mask; })}>Протигаз</Tg>
             {!gun && flag("nato", "Зброя НАТО", "+1")}
           </div>
           <KV k="Раунди по цій цілі"><Stepper value={o.rounds} min={0} max={9} show={o.rounds > 0 ? "+" + o.rounds : 0} set={v => set({ rounds: v })} /></KV>
@@ -107,33 +110,20 @@ function ShotBox({ c, d, ro, up }: SheetApi) {
   );
 }
 
-function GunsBox({ c, ro, edit, up }: SheetApi) {
-  const [adding, setAdding] = useState(false);
-  const [pick, setPick] = useState("");
-  const [buy, setBuy] = useState(false);
-  const add = () => {
-    const g = pick === "" ? undefined : GUNS[Number(pick)];
-    if (g && buy && g.p) {
-      if (c.money < g.p) { toast(`Не вистачає купонів: треба ${g.p}.`); return; }
-      toast(`Куплено: ${g.n}, −${g.p} куп.`);
-    }
-    up(x => { if (g && buy) x.money -= g.p; addGun(x, g); });
-    setAdding(false);
-    if (!g) toast("Назву, шкоду й магазин впиши через «Правити».");
-  };
+/** Weapons on the body: ammunition, reloading, jams. They are added, edited and put on in «Рюкзак». */
+function GunsBox({ c, ro, up }: SheetApi) {
+  const guns = c.weapons.map((g, i) => ({ g, i })).filter(x => x.g.on);
   return (
-    <Box title="Зброя" ro={ro} right={!ro && !adding ? <Btn sm onClick={() => setAdding(true)}>+ Додати</Btn> : undefined}>
+    <Box title="Зброя на собі" ro={ro}>
       <div>
-        {c.weapons.length === 0 && !adding && <p className="empty">Зброї немає.</p>}
-        {c.weapons.map((g, i) => {
+        {guns.length === 0 && <p className="empty">Зброї на собі немає. Її беруть у «Рюкзаку».</p>}
+        {guns.map(({ g, i }) => {
           const mag = num(g.mag), cur = clamp(num(g.cur), 0, mag), jams = num(g.jams);
           const meta = [g.dmg, g.cal, g.nato ? "НАТО +1" : ""].filter(Boolean).join(" · ");
           return (
             <div className="card" key={g.id}>
-              <div className="row between">
-                <div className="row base wrapg" style={{ minWidth: 0 }}><h3>{g.name}</h3>{meta && <span className="hint num">{meta}</span>}</div>
-                {edit && <Confirm onConfirm={() => up(x => { x.weapons.splice(i, 1); })} />}
-              </div>
+              <div className="row base wrapg" style={{ minWidth: 0 }}><h3>{g.name}</h3>{meta && <span className="hint num">{meta}</span>}</div>
+              {g.mods.length > 0 && <div className="chips">{g.mods.map(md => <span key={md.id} className="chip">{md.name}</span>)}</div>}
               {mag > 0 && <>
                 <div className="row wrapg">
                   <span className="ammo">{cur}/{mag}</span>
@@ -146,57 +136,24 @@ function GunsBox({ c, ro, edit, up }: SheetApi) {
                 </KV>
               </>}
               {g.note && <div className="hint">{g.note}</div>}
-              {edit && (
-                <div className="fgrid">
-                  <Lab name="Назва" wide><Text value={g.name} set={v => up(x => { x.weapons[i].name = v; })} /></Lab>
-                  <Lab name="Навичка"><select className="in" value={g.skill} onChange={e => up(x => { x.weapons[i].skill = e.target.value as SkillKey; })}>{WEAPON_SKILLS.map(k => <option key={k} value={k}>{SKILL_NAME[k]}</option>)}</select></Lab>
-                  <Lab name="Шкода"><Text value={g.dmg} placeholder="2к10" set={v => up(x => { x.weapons[i].dmg = v; })} /></Lab>
-                  <Lab name="Магазин"><NumIn value={mag} set={v => up(x => { x.weapons[i].mag = v; x.weapons[i].cur = Math.min(x.weapons[i].cur, v); })} /></Lab>
-                  <Lab name="Вага, кг"><NumIn value={num(g.w)} set={v => up(x => { x.weapons[i].w = v; })} /></Lab>
-                  <Lab name="Калібр"><Text value={g.cal} set={v => up(x => { x.weapons[i].cal = v; })} /></Lab>
-                  <Lab name="Режими вогню"><Text value={g.modes} placeholder="напівавтомат, автомат, по 3" set={v => up(x => { x.weapons[i].modes = v; })} /></Lab>
-                  <Lab name="Нотатка" wide><Text value={g.note} set={v => up(x => { x.weapons[i].note = v; })} /></Lab>
-                  <Check wide checked={g.nato} set={v => up(x => { x.weapons[i].nato = v; })}>Зброя НАТО, +1 до влучання</Check>
-                </div>
-              )}
             </div>
           );
         })}
-        {adding && (
-          <div className="addf">
-            <div className="row wrapg">
-              <select className="in" aria-label="Яку зброю додати" value={pick} onChange={e => setPick(e.target.value)}>
-                <option value="">Своя зброя</option>{GUNS.map((g, i) => <option key={g.n} value={i}>{g.n}, {g.p} куп.</option>)}
-              </select>
-              <Btn pri onClick={add}>Додати</Btn>
-              <Btn onClick={() => setAdding(false)}>Скасувати</Btn>
-            </div>
-            <Check checked={buy} set={setBuy}>Купити: списати купони</Check>
-          </div>
-        )}
       </div>
     </Box>
   );
 }
 
-function ArmorBox({ c, ro, edit, up }: SheetApi) {
-  const a = c.armor;
-  const tiles: [string, number][] = [["Кінет", a.kin], ["Кисл", a.acid], ["Вогонь", a.fire], ["Елект", a.elec], ["Рад", num(a.rad) + (a.mask ? 5 : 0)]];
-  const field = (name: string, key: "kin" | "acid" | "fire" | "elec" | "rad" | "w" | "slots") =>
-    <Lab name={name}><NumIn value={num(a[key])} set={v => up(x => { x.armor[key] = v; })} /></Lab>;
+/** The armour being worn and the gas mask. Other armour waits in «Рюкзак». */
+function ArmorBox({ c, ro, up }: SheetApi) {
+  const a = worn(c);
+  const tiles: [string, number][] = a ? [["Кінет", a.kin], ["Кисл", a.acid], ["Вогонь", a.fire], ["Елект", a.elec], ["Рад", num(a.rad) + (c.mask ? 5 : 0)]] : [];
   return (
     <Box title="Броня" ro={ro}>
       <div className="pad">
-        <b>{a.name}</b>
-        <div className="prot">{tiles.map(t => <div key={t[0]}><b>{num(t[1])}</b><span>{t[0]}</span></div>)}</div>
-        <Check checked={a.mask} set={v => up(x => { x.armor.mask = v; })}>Протигаз: +5 від радіації, −1 до влучання</Check>
-        {edit && (
-          <div className="fgrid">
-            <Lab name="Назва" wide><Text value={a.name} set={v => up(x => { x.armor.name = v; })} /></Lab>
-            {field("Кінетика", "kin")}{field("Кислота", "acid")}{field("Вогонь", "fire")}{field("Електрика", "elec")}{field("Радіація", "rad")}{field("Вага, кг", "w")}{field("Контейнери", "slots")}
-            <Check wide checked={a.countW} set={v => up(x => { x.armor.countW = v; })}>Рахувати вагу броні у вантаж</Check>
-          </div>
-        )}
+        {a ? <><b>{a.name}</b><div className="prot">{tiles.map(t => <div key={t[0]}><b>{num(t[1])}</b><span>{t[0]}</span></div>)}</div></>
+          : <span className="hint">Броню не надіто. Її надягають у «Рюкзаку».</span>}
+        <Check checked={c.mask} set={v => up(x => { x.mask = v; })}>Протигаз: +5 від радіації, −1 до влучання</Check>
       </div>
     </Box>
   );

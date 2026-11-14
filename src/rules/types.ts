@@ -36,18 +36,32 @@ export interface Weapon {
   nato: boolean;
   jams: number;
   note: string;
+  /** carried on the body and ready, as opposed to packed away; any number may be */
+  on: boolean;
+  /** scopes, silencers, bipods and the like */
+  mods: WeaponMod[];
 }
+
+/**
+ * An attachment. Scopes and collimators carry the rules' own +1; "other" carries whatever bonus the GM sets,
+ * and shows in the shot calculator only when that bonus is not 0. A silencer changes no roll.
+ */
+export type ModKind = "optic" | "colim" | "silencer" | "other";
+export interface WeaponMod { id: string; name: string; kind: ModKind; bonus: number }
 
 export interface Artifact { id: string; name: string; fx: string }
 export interface Ability { id: string; name: string; text: string }
 
 export interface Armor {
+  id: string;
   name: string;
   kin: number; acid: number; fire: number; elec: number; rad: number;
   w: number;
+  /** false only for the starting leather jacket, which the rules leave out of the load */
   countW: boolean;
   slots: number;
-  mask: boolean;
+  /** the one being worn; at most one armour is */
+  on: boolean;
 }
 
 export type RerollSkill = "" | "rifles" | "pistols" | "heavy" | "any";
@@ -74,7 +88,9 @@ export interface Character {
   noWater: number;
   conditions: string;
   money: number;
-  armor: Armor;
+  armors: Armor[];
+  /** a gas mask is on: +5 against radiation, −1 to hit */
+  mask: boolean;
   weapons: Weapon[];
   items: Item[];
   artifacts: Artifact[];

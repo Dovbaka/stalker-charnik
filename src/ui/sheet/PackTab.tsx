@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { MARKET, marketName } from "../../rules/data";
-import { addMarketItem, useCharge, useItem, weightParts } from "../../rules/character";
+import { GUNS, MARKET, MOD_KIND_NOTE, MOD_PRESETS, SKILL_NAME, WEAPON_SKILLS, marketName } from "../../rules/data";
+import { addGun, addMarketItem, newArmor, newMod, useCharge, useItem, wear, weightParts } from "../../rules/character";
+import type { SkillKey } from "../../rules/types";
 import { cx, fmt, kg, num, uid } from "../../util";
 import { Box, Btn, Check, Confirm, Lab, Meter, NumIn, Stepper, Text, toast } from "../bits";
 import type { SheetApi } from "../Sheet";
 
+/** Everything the character owns: coupons, the load, weapons, armour, items, artefacts. */
 export function PackTab(api: SheetApi) {
-  return <><MoneyBox {...api} /><ItemsBox {...api} /><ArtifactsBox {...api} /></>;
+  return <><MoneyBox {...api} /><WeaponsBox {...api} /><ArmorsBox {...api} /><ItemsBox {...api} /><ArtifactsBox {...api} /></>;
 }
 
 /** Coupons and the load share a box: both answer "can I take this". */
@@ -21,7 +23,7 @@ function MoneyBox({ c, d, ro, up }: SheetApi) {
   };
   const limit = d.cap * 1.5;
   const parts = weightParts(c);
-  const made = [["зброя", parts.weapons], ["речі", parts.items], ["броня", parts.armor]].filter(([, w]) => (w as number) > 0).map(([n, w]) => `${n} ${kg(w as number)}`).join(" · ");
+  const made = ([["зброя", parts.weapons], ["броня", parts.armor], ["речі", parts.items]] as [string, number][]).filter(([, w]) => w > 0).map(([n, w]) => `${n} ${kg(w)}`).join(" · ");
   return (
     <div className="stack">
       <Box title="Купони" ro={ro}>
@@ -33,13 +35,139 @@ function MoneyBox({ c, d, ro, up }: SheetApi) {
           </div>
         </div>
       </Box>
-      <Box title="Вантаж" ro={ro} right={d.over ? <span className={d.over === 2 ? "neg" : "amber"}>{d.over === 2 ? "Понад межу" : "Спритність ÷2"}</span> : undefined}>
+      <Box title="Вантаж" ro={ro} right={<span className={d.over === 2 ? "neg" : "amber"} style={{ visibility: d.over ? "visible" : "hidden" }}>{d.over === 2 ? "Понад межу" : "Спритність ÷2"}</span>}>
         <div className="pad">
           <div className="row between base wrapg"><span className="big">{kg(d.weight)}<small> / {d.cap} кг</small></span><span className="hint num">{made || "нічого"}</span></div>
           <Meter value={d.weight} max={limit} cls={cx("load", d.over === 1 && "over", d.over === 2 && "limit")} marks={[d.cap]} label={`Вантаж ${kg(d.weight)} кг: без штрафу до ${d.cap}, межа ${kg(limit)}`} />
         </div>
       </Box>
     </div>
+  );
+}
+
+/** Every weapon owned. "На собі" marks the ones carried ready; those appear in «Бій». */
+function WeaponsBox({ c, ro, edit, up }: SheetApi) {
+  const [adding, setAdding] = useState(false);
+  const [pick, setPick] = useState("");
+  const [buy, setBuy] = useState(false);
+  const add = () => {
+    const g = pick === "" ? undefined : GUNS[Number(pick)];
+    if (g && buy && g.p) {
+      if (c.money < g.p) { toast(`Не вистачає купонів: треба ${g.p}.`); return; }
+      toast(`Куплено: ${g.n}, −${g.p} куп.`);
+    }
+    up(x => { if (g && buy) x.money -= g.p; addGun(x, g); });
+    setAdding(false);
+    if (!g) toast("Назву, шкоду й магазин впиши через «Правити».");
+  };
+  return (
+    <Box title="Зброя" ro={ro} right={!ro && !adding ? <Btn sm onClick={() => setAdding(true)}>+ Додати</Btn> : undefined}>
+      <div>
+        {c.weapons.length === 0 && !adding && <p className="empty">Зброї немає.</p>}
+        {c.weapons.map((g, i) => {
+          const meta = [g.dmg, g.cal, g.mag ? `магазин ${g.mag}` : "", g.nato ? "НАТО" : ""].filter(Boolean).join(" · ");
+          return (
+            <div className="card" key={g.id}>
+              <div className="row between" style={{ alignItems: "flex-start" }}>
+                <div className="nm" style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                  <b style={{ overflowWrap: "anywhere" }}>{g.name}</b>
+                  <span className="hint num">{meta || SKILL_NAME[g.skill]}</span>
+                </div>
+                <span className="iw num">{kg(num(g.w))} кг</span>
+              </div>
+              {g.mods.length > 0 && !edit && <div className="chips">{g.mods.map(md => <span key={md.id} className="chip">{md.name}</span>)}</div>}
+              <Check checked={g.on} set={v => up(x => { x.weapons[i].on = v; })}>На собі</Check>
+              {edit && <WeaponEdit {...{ c, up, i }} />}
+            </div>
+          );
+        })}
+        {adding && (
+          <div className="addf">
+            <div className="row wrapg">
+              <select className="in" aria-label="Яку зброю додати" value={pick} onChange={e => setPick(e.target.value)}>
+                <option value="">Своя зброя</option>{GUNS.map((g, i) => <option key={g.n} value={i}>{g.n}, {g.p} куп.</option>)}
+              </select>
+              <Btn pri onClick={add}>Додати</Btn>
+              <Btn onClick={() => setAdding(false)}>Скасувати</Btn>
+            </div>
+            <Check checked={buy} set={setBuy}>Купити: списати купони</Check>
+          </div>
+        )}
+      </div>
+    </Box>
+  );
+}
+
+/** A weapon's own numbers and its attachments, in «Правити». */
+function WeaponEdit({ c, up, i }: Pick<SheetApi, "c" | "up"> & { i: number }) {
+  const g = c.weapons[i];
+  const [preset, setPreset] = useState("0");
+  const addMod = () => {
+    const p = preset === "own" ? { name: "Модифікація", kind: "other" as const, bonus: 0 } : MOD_PRESETS[Number(preset)];
+    if (p) up(x => { x.weapons[i].mods.push(newMod(p)); });
+  };
+  return <>
+    <div className="fgrid">
+      <Lab name="Назва" wide><Text value={g.name} set={v => up(x => { x.weapons[i].name = v; })} /></Lab>
+      <Lab name="Навичка"><select className="in" value={g.skill} onChange={e => up(x => { x.weapons[i].skill = e.target.value as SkillKey; })}>{WEAPON_SKILLS.map(k => <option key={k} value={k}>{SKILL_NAME[k]}</option>)}</select></Lab>
+      <Lab name="Шкода"><Text value={g.dmg} placeholder="2к10" set={v => up(x => { x.weapons[i].dmg = v; })} /></Lab>
+      <Lab name="Магазин"><NumIn value={num(g.mag)} set={v => up(x => { x.weapons[i].mag = v; x.weapons[i].cur = Math.min(x.weapons[i].cur, v); })} /></Lab>
+      <Lab name="Вага, кг"><NumIn value={num(g.w)} set={v => up(x => { x.weapons[i].w = v; })} /></Lab>
+      <Lab name="Калібр"><Text value={g.cal} set={v => up(x => { x.weapons[i].cal = v; })} /></Lab>
+      <Lab name="Режими вогню"><Text value={g.modes} placeholder="напівавтомат, автомат, по 3" set={v => up(x => { x.weapons[i].modes = v; })} /></Lab>
+      <Lab name="Нотатка" wide><Text value={g.note} set={v => up(x => { x.weapons[i].note = v; })} /></Lab>
+      <Check wide checked={g.nato} set={v => up(x => { x.weapons[i].nato = v; })}>Зброя НАТО, +1 до влучання</Check>
+    </div>
+    <div className="lbl">Модифікації</div>
+    {g.mods.map((md, j) => (
+      <div className="edrow" key={md.id} style={{ paddingTop: 0 }}>
+        {md.kind === "other" ? <Text value={md.name} label="Назва модифікації" set={v => up(x => { x.weapons[i].mods[j].name = v; })} className="grow" /> : <b>{md.name}</b>}
+        {md.kind === "other"
+          ? <span className="row hint">бонус <Stepper value={num(md.bonus)} min={-5} max={5} show={num(md.bonus) > 0 ? "+" + md.bonus : md.bonus} set={v => up(x => { x.weapons[i].mods[j].bonus = v; })} /></span>
+          : <span className="hint">{MOD_KIND_NOTE[md.kind]}</span>}
+        <Confirm title="Зняти модифікацію" onConfirm={() => up(x => { x.weapons[i].mods.splice(j, 1); })} />
+      </div>
+    ))}
+    <div className="row wrapg">
+      <select className="in" aria-label="Яку модифікацію додати" value={preset} onChange={e => setPreset(e.target.value)}>
+        {MOD_PRESETS.map((p, k) => <option key={p.name} value={k}>{p.name}</option>)}<option value="own">Своя модифікація</option>
+      </select>
+      <Btn onClick={addMod}>Додати</Btn>
+    </div>
+    <div><Confirm sm={false} label="Викинути зброю" ask="Точно викинути?" title="Викинути зброю" onConfirm={() => up(x => { x.weapons.splice(i, 1); })} /></div>
+  </>;
+}
+
+/** Every armour owned. Only one can be worn; its numbers protect in «Бій». */
+function ArmorsBox({ c, ro, edit, up }: SheetApi) {
+  const field = (i: number, name: string, key: "kin" | "acid" | "fire" | "elec" | "rad" | "w" | "slots") =>
+    <Lab name={name}><NumIn value={num(c.armors[i][key])} set={v => up(x => { x.armors[i][key] = v; })} /></Lab>;
+  return (
+    <Box title="Броня" ro={ro} right={!ro ? <Btn sm onClick={() => up(x => { x.armors.push(newArmor()); })}>+ Додати</Btn> : undefined}>
+      <div>
+        {c.armors.length === 0 && <p className="empty">Броні немає.</p>}
+        {c.armors.map((a, i) => (
+          <div className="card" key={a.id}>
+            <div className="row between" style={{ alignItems: "flex-start" }}>
+              <div style={{ display: "grid", gap: 2, minWidth: 0 }}>
+                <b style={{ overflowWrap: "anywhere" }}>{a.name}</b>
+                <span className="hint num">кін {num(a.kin)} · кисл {num(a.acid)} · вог {num(a.fire)} · ел {num(a.elec)} · рад {num(a.rad)}</span>
+              </div>
+              <span className="iw num">{a.countW ? kg(num(a.w)) + " кг" : "—"}</span>
+            </div>
+            <Check checked={a.on} set={() => up(x => wear(x, a.id))}>Надіта</Check>
+            {edit && <>
+              <div className="fgrid">
+                <Lab name="Назва" wide><Text value={a.name} set={v => up(x => { x.armors[i].name = v; })} /></Lab>
+                {field(i, "Кінетика", "kin")}{field(i, "Кислота", "acid")}{field(i, "Вогонь", "fire")}{field(i, "Електрика", "elec")}{field(i, "Радіація", "rad")}{field(i, "Вага, кг", "w")}{field(i, "Контейнери", "slots")}
+                <Check wide checked={a.countW} set={v => up(x => { x.armors[i].countW = v; })}>Рахувати вагу у вантаж</Check>
+              </div>
+              <div><Confirm sm={false} label="Викинути броню" ask="Точно викинути?" title="Викинути броню" onConfirm={() => up(x => { x.armors.splice(i, 1); })} /></div>
+            </>}
+          </div>
+        ))}
+      </div>
+    </Box>
   );
 }
 
@@ -66,7 +194,7 @@ function ItemsBox({ c, ro, edit, up }: SheetApi) {
   return (
     <Box title="Речі" ro={ro} right={!ro && !adding ? <Btn sm onClick={() => setAdding(true)}>+ Додати</Btn> : undefined}>
       <div>
-        {c.items.length === 0 && !adding && <p className="empty">Рюкзак порожній.</p>}
+        {c.items.length === 0 && !adding && <p className="empty">Речей немає.</p>}
         {c.items.map((it, i) => {
           const q = num(it.qty);
           return (

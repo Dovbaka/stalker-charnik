@@ -1,8 +1,8 @@
 // Everything the rules compute from a sheet. Pure functions: no React, no Firebase.
 // Functions that take a `c` and return nothing mutate it; call them inside an immer recipe.
 import { clamp, num, uid } from "../util";
-import { ATTR_KEYS, ATTR_PTS, CUSTOM_GUN, GUNS, MARKET, RAD_PEN, SKILL_KEYS, SKILL_NAME, SKILL_PTS, START_MONEY, marketName, type GunEntry, type MarketEntry } from "./data";
-import type { AttrKey, Character, Item, SkillKey } from "./types";
+import { ATTR_KEYS, ATTR_PTS, CUSTOM_GUN, GUNS, MARKET, RAD_PEN, SKILL_KEYS, SKILL_NAME, SKILL_PTS, START_MONEY, marketName, type GunEntry, type MarketEntry, type ModPreset } from "./data";
+import type { Armor, AttrKey, Character, Item, SkillKey, Weapon } from "./types";
 
 /* ---------- shape ---------- */
 const zeroAttrs = (v: number) => Object.fromEntries(ATTR_KEYS.map(k => [k, v])) as Record<AttrKey, number>;
@@ -16,12 +16,21 @@ export function blankCharacter(): Character {
     zone: 0, freeSkill: 0, freeAttr: 0,
     hp: 15, woundsTreated: false, bleed: 0, rad: 0, vodka: 0, noSleep: 0, noFood: 0, noWater: 0, conditions: "",
     money: START_MONEY,
-    armor: { name: "Шкіряна куртка", kin: 2, acid: 2, fire: 2, elec: 2, rad: 0, w: 3, countW: false, slots: 1, mask: false },
+    armors: [startingJacket()],
+    mask: false,
     weapons: [], items: [], artifacts: [], abilities: [],
     reroll: { skill: "", bonus: 2 },
     luck: { pool: 0, cur: 0 },
     notes: "", createdAt: 0, updatedAt: 0,
   };
+}
+
+/** Everyone enters the Zone in a leather jacket; the rules keep it out of the load. */
+export function startingJacket(): Armor {
+  return { id: uid(), name: "Шкіряна куртка", kin: 2, acid: 2, fire: 2, elec: 2, rad: 0, w: 3, countW: false, slots: 1, on: true };
+}
+export function newArmor(): Armor {
+  return { id: uid(), name: "Нова броня", kin: 0, acid: 0, fire: 0, elec: 0, rad: 0, w: 0, countW: true, slots: 0, on: false };
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
@@ -36,11 +45,24 @@ export function migrate(raw: unknown): Character {
       else if (v !== undefined) s[k] = v;
     }
   }
-  for (const k of ["weapons", "items", "artifacts", "abilities"]) {
+  // sheets saved before several armours existed kept one `armor` (with the gas mask on it)
+  if (isObj(raw) && isObj(raw.armor) && !Array.isArray(raw.armors)) {
+    const { mask, ...old } = raw.armor;
+    s.armors = [{ ...startingJacket(), ...old, on: true }];
+    if (raw.mask === undefined) s.mask = !!mask;
+  }
+  delete s.armor;
+  for (const k of ["weapons", "items", "artifacts", "abilities", "armors"]) {
     const list = Array.isArray(s[k]) ? (s[k] as unknown[]).filter(isObj).map(x => ({ ...x })) : [];
     for (const x of list) if (!x.id) x.id = uid();
     s[k] = list;
   }
+  for (const g of s.weapons as Record<string, unknown>[]) {
+    if (typeof g.on !== "boolean") g.on = true;
+    g.mods = Array.isArray(g.mods) ? (g.mods as unknown[]).filter(isObj).map(m => ({ id: m.id || uid(), name: String(m.name ?? ""), kind: m.kind ?? "other", bonus: num(m.bonus) })) : [];
+  }
+  const armors = s.armors as Record<string, unknown>[];
+  armors.forEach((a, i) => { a.on = !!a.on && armors.findIndex(x => x.on) === i; });
   delete s.by;
   delete s.secret; // private notes live in their own document
   s.v = 2;
@@ -67,8 +89,15 @@ export function setHp(c: Character, v: number): void {
 }
 export type DamageType = "kin" | "none" | "acid" | "fire" | "elec";
 /** Applies incoming damage through armour; returns what actually got through and what the armour took. */
+/** The armour being worn, or none. */
+export const worn = (c: Character): Armor | undefined => c.armors.find(a => a.on);
+/** Puts one armour on and takes any other off. */
+export function wear(c: Character, id: string): void {
+  for (const a of c.armors) a.on = a.id === id ? !a.on : false;
+}
 export function takeDamage(c: Character, amount: number, type: DamageType): { real: number; absorbed: number } {
-  const arm = type === "none" ? 0 : num(c.armor[type]);
+  const a = worn(c);
+  const arm = type === "none" || !a ? 0 : num(a[type]);
   const real = Math.max(0, amount - arm);
   setHp(c, c.hp - real);
   return { real, absorbed: Math.min(arm, amount) };
@@ -79,7 +108,8 @@ export function weightParts(c: Character): { items: number; weapons: number; arm
   let items = 0, weapons = 0;
   for (const it of c.items) items += num(it.qty) * num(it.w);
   for (const g of c.weapons) weapons += num(g.w);
-  return { items, weapons, armor: c.armor.countW ? num(c.armor.w) : 0 };
+  const armor = c.armors.reduce((sum, a) => sum + (a.countW ? num(a.w) : 0), 0);
+  return { items, weapons, armor };
 }
 export function totalWeight(c: Character): number {
   const p = weightParts(c);
@@ -180,8 +210,10 @@ export interface ShotOpts {
   /** id of the character's weapon the shot is fired from; "" when none is picked */
   weapon: string;
   mode: FireMode;
+  /** attachments of kind "other" switched on for this shot, by id */
+  mods: string[];
 }
-export const SHOT0: ShotOpts = { skill: "rifles", shot: "aimed", sit: false, optic: false, colim: false, near: "far", cover: "0", tprone: false, vis: false, invis: false, lying: false, rounds: 0, nato: false, jam: 0, extra: 0, weapon: "", mode: "single" };
+export const SHOT0: ShotOpts = { skill: "rifles", shot: "aimed", sit: false, optic: false, colim: false, near: "far", cover: "0", tprone: false, vis: false, invis: false, lying: false, rounds: 0, nato: false, jam: 0, extra: 0, weapon: "", mode: "single", mods: [] };
 
 /** Fire modes from the rules: how many shots one action fires and the penalty on each. */
 export type FireMode = "single" | "semi" | "burst" | "auto";
@@ -222,15 +254,27 @@ export interface ShotCalc {
 }
 
 const SHOT_SKILLS = ["rifles", "pistols", "heavy"] as const;
-/** Ranged weapons the calculator can fire. */
-export const rangedWeapons = (c: Character) => c.weapons.filter(g => (SHOT_SKILLS as readonly string[]).includes(g.skill));
+/** Ranged weapons on the body: the ones the calculator can fire. */
+export const rangedWeapons = (c: Character) => c.weapons.filter(g => g.on && (SHOT_SKILLS as readonly string[]).includes(g.skill));
+const gunOf = (c: Character, o: ShotOpts): Weapon | undefined => (o.weapon ? rangedWeapons(c).find(x => x.id === o.weapon) : undefined);
+export const hasMod = (g: Weapon, kind: Weapon["mods"][number]["kind"]) => g.mods.some(m => m.kind === kind);
 
-/** The options as they apply: a picked weapon decides the skill, NATO bonus, jams and which fire modes exist. */
+/**
+ * The options as they apply. A picked weapon decides the skill, NATO bonus, jams and fire modes, and a scope or a
+ * collimator counts only if the weapon has one.
+ */
 export function resolveShot(c: Character, o: ShotOpts): ShotOpts {
-  const g = o.weapon ? rangedWeapons(c).find(x => x.id === o.weapon) : undefined;
-  if (!g) return { ...o, weapon: "" };
+  const base = { ...o, mods: Array.isArray(o.mods) ? o.mods : [] };
+  const g = gunOf(c, base);
+  if (!g) return { ...base, weapon: "" };
   const modes = weaponModes(g.modes);
-  return { ...o, skill: g.skill as ShotOpts["skill"], nato: !!g.nato, jam: clamp(num(g.jams), 0, 2), mode: modes.includes(o.mode) ? o.mode : "single" };
+  return {
+    ...base,
+    skill: g.skill as ShotOpts["skill"], nato: !!g.nato, jam: clamp(num(g.jams), 0, 2),
+    mode: modes.includes(base.mode) ? base.mode : "single",
+    optic: base.optic && hasMod(g, "optic"),
+    colim: base.colim && hasMod(g, "colim"),
+  };
 }
 export function shotCalc(c: Character, d: Derived, o: ShotOpts): ShotCalc {
   const parts: [string, number][] = [[SKILL_NAME[o.skill], num(c.skills[o.skill])]];
@@ -244,7 +288,10 @@ export function shotCalc(c: Character, d: Derived, o: ShotOpts): ShotCalc {
   if (o.cover === "1") P("укриття ½", -1);
   if (o.cover === "3") P("укриття ¾", -3);
   if (o.tprone) P("ціль лежить", -1);
-  if (c.armor.mask) P("протигаз", -1);
+  if (c.mask) P("протигаз", -1);
+  for (const md of gunOf(c, o)?.mods ?? []) {
+    if (md.kind === "other" && num(md.bonus) !== 0 && o.mods.includes(md.id)) P(md.name.toLowerCase(), num(md.bonus));
+  }
   if (o.vis) P("погана видимість", -2);
   if (o.invis) P("ціль невидима", -3);
   if (o.lying) P("стрільба лежачи", -2);
@@ -279,8 +326,9 @@ export function addMarketItem(c: Character, m: MarketEntry): void {
   if (m.fx) o.fx = m.fx;
   c.items.push(o);
 }
+export const newMod = (p: ModPreset) => ({ id: uid(), name: p.name, kind: p.kind, bonus: p.bonus });
 export function addGun(c: Character, g: GunEntry = CUSTOM_GUN): void {
-  c.weapons.push({ id: uid(), name: g.n, skill: g.skill, dmg: g.dmg, mag: g.mag, cur: g.mag, modes: g.modes, w: g.w, cal: g.cal, nato: !!g.nato, jams: 0, note: g.note });
+  c.weapons.push({ id: uid(), name: g.n, skill: g.skill, dmg: g.dmg, mag: g.mag, cur: g.mag, modes: g.modes, w: g.w, cal: g.cal, nato: !!g.nato, jams: 0, note: g.note, on: true, mods: (g.mods ?? []).map(newMod) });
 }
 /** Spends one use of a kit; an emptied kit takes one off the count and opens the next. */
 export function useCharge(it: Item): void {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { derive, type Derived } from "../rules/character";
 import type { Character } from "../rules/types";
 import { useCampaign } from "../state/context";
@@ -8,6 +8,7 @@ import { CardTab } from "./sheet/CardTab";
 import { CombatTab } from "./sheet/CombatTab";
 import { NotesTab } from "./sheet/NotesTab";
 import { PackTab } from "./sheet/PackTab";
+import { RestDialog } from "./sheet/RestDialog";
 
 /** What every box of the sheet gets. */
 export interface SheetApi {
@@ -30,6 +31,8 @@ export function Sheet({ id, menu }: { id: string; menu: () => void }) {
   const [tab, setTab] = usePersistedString("charnik.tab", "sheet");
   const [edit, setEdit] = useState(false);
   const [online, setOnline] = useState(() => navigator.onLine);
+  const [resting, setResting] = useState(false);
+  const closeRest = useCallback(() => setResting(false), []);
   const d = useMemo(() => (c ? derive(c) : null), [c]);
 
   useEffect(() => { if (!own) return; camp.openSecret(id); return () => camp.closeSecret(); }, [camp, id, own]);
@@ -61,6 +64,7 @@ export function Sheet({ id, menu }: { id: string; menu: () => void }) {
           <div className="row wrapg" style={{ justifyContent: "flex-end" }}>
             {status && <span className={cx("sync", own && st.sync === "err" && "s-err", own && st.sync === "saving" && "s-saving")}>{status}</span>}
             <Btn sm onClick={menu}>Персонажі</Btn>
+            {own && <Btn sm onClick={() => setResting(true)}>Відпочити</Btn>}
             {own && <Btn sm pri={edit} onClick={() => setEdit(!edit)}>{edit ? "Готово" : "Правити"}</Btn>}
           </div>
         </div>
@@ -73,6 +77,7 @@ export function Sheet({ id, menu }: { id: string; menu: () => void }) {
         {current === "notes" && <NotesTab {...api} />}
       </main>
       <nav className="navb" aria-label="Розділи">{tabs}</nav>
+      {resting && own && <RestDialog {...api} close={closeRest} />}
     </div>
   );
 }

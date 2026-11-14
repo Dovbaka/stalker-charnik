@@ -1,6 +1,6 @@
 // Pieces shared by several tabs: the health box and the luck buttons.
 import { useState } from "react";
-import { LUCK_COST, dawnLuck, setHp, setLuckPool, spendLuck, takeDamage, type DamageType, type LuckUse } from "../../rules/character";
+import { LUCK_COST, setHp, setLuckPool, spendLuck, takeDamage, worn, type DamageType, type LuckUse } from "../../rules/character";
 import { num } from "../../util";
 import { Box, Btn, Check, Dots, KV, Meter, Stepper, toast } from "../bits";
 import type { SheetApi } from "../Sheet";
@@ -13,14 +13,15 @@ function healthTint(max: number, [m1, m2, m3]: [number, number, number]): string
 
 /**
  * Health: the number in its colour, the bar with the wound thresholds, and a field for how much to take off or give back
- * (empty means 1). In combat the damage goes through the chosen armour, and bleeding is counted down here.
+ * (empty means 1). In combat the damage goes through the worn armour.
  * Nothing in this box appears or disappears when a number changes, so the buttons never move under a finger.
  */
 export function HealthBox({ c, d, ro, up, combat }: SheetApi & { combat?: boolean }) {
   const [amt, setAmt] = useState("");
   const [type, setType] = useState<DamageType>("kin");
-  const a = c.armor;
-  const types: [DamageType, string][] = [["kin", `кінетика, броня ${num(a.kin)}`], ["none", "повз броню"], ["acid", `кислота, броня ${num(a.acid)}`], ["fire", `вогонь, броня ${num(a.fire)}`], ["elec", `електрика, броня ${num(a.elec)}`]];
+  const a = worn(c);
+  const arm = (k: "kin" | "acid" | "fire" | "elec") => (a ? `, броня ${num(a[k])}` : "");
+  const types: [DamageType, string][] = [["kin", "кінетика" + arm("kin")], ["none", "повз броню"], ["acid", "кислота" + arm("acid")], ["fire", "вогонь" + arm("fire")], ["elec", "електрика" + arm("elec")]];
   const amount = () => { const n = Math.round(num(amt, 1)); return n > 0 ? n : 0; };
   const minus = () => {
     const n = amount(); if (!n) return;
@@ -43,7 +44,7 @@ export function HealthBox({ c, d, ro, up, combat }: SheetApi & { combat?: boolea
           label={`Здоров'я ${c.hp} з ${d.max}. Поранення від ${d.marks.join(", ")}, смерть на ${d.deathAt}.`} />
         <div className="hpctl">
           {combat && <select className="in" aria-label="Чим поранено" value={type} onChange={e => setType(e.target.value as DamageType)}>{types.map(t => <option key={t[0]} value={t[0]}>{t[1]}</option>)}</select>}
-          <input className="in w4 num" inputMode="numeric" placeholder="1" aria-label="Скільки" value={amt} onChange={e => setAmt(e.target.value)} onKeyDown={e => { if (e.key === "Enter") minus(); }} />
+          <input className="in w4 num" inputMode="numeric" placeholder="0" aria-label="Скільки" value={amt} onChange={e => setAmt(e.target.value)} onKeyDown={e => { if (e.key === "Enter") minus(); }} />
           <Btn sq dng aria-label={combat ? "Отримати шкоду" : "Відняти здоров'я"} title={combat ? "Шкода" : "Відняти"} onClick={minus}>−</Btn>
           <Btn sq aria-label="Додати здоров'я" title="Додати" onClick={plus}>+</Btn>
         </div>
@@ -61,21 +62,16 @@ export function HealthBox({ c, d, ro, up, combat }: SheetApi & { combat?: boolea
   );
 }
 
-const USES: [LuckUse, string, string][] = [["bonus", "±1", "+1 до перевірки або −1 ворогу"], ["reroll", "Перекид", "перекинути к10, свій чи ворожий"], ["auto", "Автоуспіх", "автоуспіх або автопровал ворога"]];
-const SPENT: Record<LuckUse, string> = { bonus: "±1 до перевірки", reroll: "перекид", auto: "автоуспіх" };
+const USES: [LuckUse, string, string][] = [["bonus", "+1 / −1", "+1 до своєї перевірки або −1 ворогу"], ["reroll", "Перекид", "перекинути к10, свій чи ворожий"], ["auto", "Автоуспіх", "автоуспіх або автопровал ворога"]];
+const SPENT: Record<LuckUse, string> = { bonus: "+1 / −1", reroll: "перекид", auto: "автоуспіх" };
 
-/** Spend luck for its three uses, get it back at dawn, set the pool. */
-export function LuckControls({ c, ro, up, restore = true }: SheetApi & { restore?: boolean }) {
+/** Spend luck on its three uses; on the card the pool can be set too. It comes back through «Відпочити». */
+export function LuckControls({ c, ro, up, pool: showPool }: SheetApi & { pool?: boolean }) {
   const cur = num(c.luck.cur), pool = num(c.luck.pool);
   const spend = (use: LuckUse) => {
     let ok = false;
     up(x => { ok = spendLuck(x, use); });
     if (ok) toast(`Удача: ${SPENT[use]}.`);
-  };
-  const dawn = (safe: boolean) => {
-    let got = 0;
-    up(x => { got = dawnLuck(x, safe); });
-    toast(got ? `Удача +${got}.` : "Удача й так повна.");
   };
   return (
     <div className="pad">
@@ -83,16 +79,14 @@ export function LuckControls({ c, ro, up, restore = true }: SheetApi & { restore
         <span className="big">{cur}<small>/{pool}</small></span>
         {pool > 0 && pool <= 12 && <Dots cls="pips" on={cur} of={pool} />}
       </div>
-      <div className="row wrapg">
-        {USES.map(([use, name, title]) => <Btn key={use} title={title} disabled={ro || cur < LUCK_COST[use]} onClick={() => spend(use)}>{name}<span className="cost">{LUCK_COST[use]}</span></Btn>)}
+      <div className="luckbtns">
+        {USES.map(([use, name, title]) => (
+          <button type="button" key={use} className="btn" title={title} disabled={ro || cur < LUCK_COST[use]} onClick={() => spend(use)}>
+            <span>{name}</span><small>{LUCK_COST[use]} уд.</small>
+          </button>
+        ))}
       </div>
-      {restore && <>
-        <div className="row wrapg">
-          <Btn disabled={ro || cur >= pool} onClick={() => dawn(false)}>Світанок +2</Btn>
-          <Btn disabled={ro || cur >= pool} onClick={() => dawn(true)}>У безпеці +3</Btn>
-        </div>
-        {!ro && <KV k="Пул удачі"><Stepper value={pool} min={0} max={99} set={v => up(x => { const was = num(x.luck.pool); setLuckPool(x, v); if (v > was) x.luck.cur = num(x.luck.cur) + (v - was); })} /></KV>}
-      </>}
+      {showPool && !ro && <KV k="Пул удачі"><Stepper value={pool} min={0} max={99} set={v => up(x => { const was = num(x.luck.pool); setLuckPool(x, v); if (v > was) x.luck.cur = num(x.luck.cur) + (v - was); })} /></KV>}
     </div>
   );
 }
