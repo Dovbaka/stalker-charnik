@@ -1,0 +1,1252 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#12150e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#d6d3bd" media="(prefers-color-scheme: light)">
+<style>:root{color-scheme:light;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Чарнік сталкера</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=PT+Mono&family=PT+Sans:wght@400;700&display=swap">
+<style>
+/* Layout: a field form. Three screens share one frame: the roster, a five-step creation wizard and the sheet.
+   The sheet is a sticky vitals strip over ruled "form boxes" that flow into one, two or three columns;
+   on a phone the section tabs sit in a bar at the bottom, within reach of the thumb. */
+:root{
+  --paper:#d6d3bd; --box:#e3e0cc; --box-2:#cbc8af; --ink:#1d2119; --ink-soft:#54584a; --line:#8a8870;
+  --olive:#47552a; --olive-ink:#f0eedc; --red:#9d2a1c; --amber:#7d5600; --ok:#356330;
+  --font-d:"Oswald","Arial Narrow",Impact,sans-serif;
+  --font-m:"PT Mono",ui-monospace,Menlo,Consolas,monospace;
+  --font-b:"PT Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#12150e; --box:#1a1e14; --box-2:#252b1c; --ink:#dcd9be; --ink-soft:#9d9c82; --line:#474d36;
+    --olive:#a9bd5a; --olive-ink:#141709; --red:#ee6048; --amber:#f0b73a; --ok:#86c06a; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#12150e; --box:#1a1e14; --box-2:#252b1c; --ink:#dcd9be; --ink-soft:#9d9c82; --line:#474d36;
+  --olive:#a9bd5a; --olive-ink:#141709; --red:#ee6048; --amber:#f0b73a; --ok:#86c06a; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font:15px/1.45 var(--font-b);-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+h1,h2,h3{margin:0;font-family:var(--font-d);font-weight:600;text-transform:uppercase;letter-spacing:.06em;text-wrap:balance}
+p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.num{font-family:var(--font-m);font-variant-numeric:tabular-nums}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 32px}
+#app.sc-sheet,#app.sc-wiz{padding-bottom:76px}
+
+/* title block */
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding-bottom:12px}
+.who{min-width:0}
+.formno{font:12px/1.3 var(--font-m);color:var(--ink-soft);letter-spacing:.03em}
+h1{font-size:clamp(32px,9vw,54px);line-height:1.05;letter-spacing:.03em;overflow-wrap:anywhere}
+.sub{color:var(--ink-soft);font-size:14px}
+.top-r{display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex:none}
+.stamp{font:600 13px/1 var(--font-d);text-transform:uppercase;letter-spacing:.14em;border:2px solid currentColor;padding:5px 9px 4px;transform:rotate(-4deg);white-space:nowrap}
+.st-ok{color:var(--ok)} .st-warn{color:var(--amber)} .st-bad{color:var(--red)}
+.warnbar{border:1px solid var(--red);color:var(--red);padding:8px 12px;margin-bottom:12px;font-size:14px}
+
+/* sticky strip and tabs */
+.stick{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);padding-block:8px;border-block:2px solid var(--ink);display:grid;gap:8px}
+.vit{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:13px}
+.vit b{font-size:17px;font-weight:400}
+.vit .amber{display:inline-flex;align-items:center;gap:4px}
+.tre{width:15px;height:15px;flex:none}
+.tabs{display:flex}
+.tab{flex:1 1 0;min-width:0;border:1px solid var(--ink);border-left-width:0;border-radius:0;background:transparent;color:var(--ink);font:500 14px/1 var(--font-d);text-transform:uppercase;letter-spacing:.08em;min-height:40px;cursor:pointer;padding:0 4px}
+.tab:first-child{border-left-width:1px}
+.tab.on{background:var(--ink);color:var(--paper)}
+.stick .tabs{display:none}
+.navb{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;background:var(--paper);border-top:2px solid var(--ink);padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.navb .tab{min-height:56px;border-width:0 0 0 1px;font-size:13px}
+.navb .tab:first-child{border-left-width:0}
+@media (min-width:760px){
+  #app.sc-sheet{padding-bottom:0}
+  .navb{display:none}
+  .stick .tabs{display:flex}
+}
+
+/* boxes */
+.grid{columns:3 330px;column-gap:14px;padding-top:14px}
+.grid>.box{break-inside:avoid;margin:0 0 14px}
+.box{border:1px solid var(--line);background:var(--box);min-width:0}
+.box>h2{font-size:13px;padding:7px 12px 6px;background:var(--box-2);border-bottom:1px solid var(--line)}
+.pad{padding:12px;display:grid;gap:12px}
+.sep{border-top:1px dashed var(--line)}
+.lbl{font:500 12px/1.2 var(--font-d);text-transform:uppercase;letter-spacing:.09em;color:var(--ink-soft);display:flex;align-items:center;gap:5px}
+.hint{font-size:13px;color:var(--ink-soft)}
+.big{font:400 40px/1 var(--font-m)}
+.big small{font-size:17px;color:var(--ink-soft)}
+.ok{color:var(--ok)} .warn,.amber{color:var(--amber)} .bad,.neg{color:var(--red)} .pos{color:var(--ok)}
+.row{display:flex;align-items:center;gap:8px}
+.between{justify-content:space-between} .end{align-items:flex-end} .wrapg{flex-wrap:wrap}
+.btns{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.kv{display:flex;justify-content:space-between;align-items:center;gap:6px 10px;flex-wrap:wrap}
+.kv>span:first-child{min-width:0}
+
+.btn{appearance:none;border:1px solid var(--ink);background:transparent;color:var(--ink);font:13px/1 var(--font-m);padding:0 10px;min-height:40px;min-width:40px;cursor:pointer;border-radius:2px;white-space:nowrap}
+.btn:hover{background:var(--box-2)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.pri{background:var(--olive);border-color:var(--olive);color:var(--olive-ink)}
+.btn.dng{border-color:var(--red);color:var(--red)}
+.btn.sm{min-height:32px;min-width:32px;font-size:12px;padding:0 8px}
+.btn.sq{padding:0;width:40px}
+.btn.lg{min-height:48px;font-size:15px;padding:0 18px}
+.step{display:inline-flex;align-items:stretch;flex:none}
+.step .btn{border-radius:0}
+.step output{min-width:3.2em;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;gap:4px;border-block:1px solid var(--ink);font:15px/1 var(--font-m);font-variant-numeric:tabular-nums}
+
+.in{width:100%;min-width:0;border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:7px 10px;min-height:40px;border-radius:2px;font:16px/1.3 var(--font-b)}
+.in.w4{width:4.6em;flex:none} .in.w6{width:7em;flex:none}
+select.in{width:auto;max-width:100%;flex:1 1 9em}
+textarea.in{display:block;resize:vertical;line-height:1.45}
+.ta{min-height:220px}
+.code{font:12px/1.45 var(--font-m);min-height:120px;word-break:break-all}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+.chk input{width:18px;height:18px;flex:none;accent-color:var(--olive)}
+.fl{display:grid;gap:3px;min-width:0}
+.fl>span{font:500 11px/1.2 var(--font-d);text-transform:uppercase;letter-spacing:.09em;color:var(--ink-soft)}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.fgrid .wide{grid-column:1/-1}
+
+/* bars */
+.bar{position:relative;height:14px;border:1px solid var(--ink);background:var(--box-2)}
+.bar>i{display:block;height:100%;background:var(--ok)}
+.bar>b{position:absolute;top:0;bottom:0;width:1px;background:var(--ink)}
+.bar.warn>i{background:var(--amber)} .bar.bad>i{background:var(--red)} .bar.rad>i{background:var(--amber)}
+.bar.mini{display:inline-block;width:72px;height:9px;flex:none}
+
+/* attributes and skills */
+.arow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.arow:last-child{border-bottom:0}
+.an{min-width:0;display:grid;gap:4px}
+.an h3{font-size:16px}
+.av{font:400 38px/1 var(--font-m);font-variant-numeric:tabular-nums;text-align:right;flex:none}
+.av small{display:block;font-size:11px;color:var(--ink-soft);margin-top:3px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font:12px/1.3 var(--font-m);border:1px solid currentColor;padding:1px 6px;border-radius:2px}
+.edrow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:13px;color:var(--ink-soft)}
+.sg{padding:8px 12px 10px;border-bottom:1px solid var(--line)}
+.sg:last-child{border-bottom:0}
+.sg>.lbl{margin-bottom:4px}
+.srow{display:flex;align-items:center;gap:10px;min-height:36px;padding-block:3px}
+.srow .sn{flex:1 1 auto;min-width:0;display:grid}
+.srow.zero .sn,.srow.zero .pips,.srow.zero .sv{color:var(--ink-soft)}
+.pips{font-size:11px;letter-spacing:2px;flex:none}
+.sv{width:1.4em;text-align:right;flex:none;font-size:17px}
+.sh{font-size:12px}
+
+/* shot calculator */
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.tg{appearance:none;border:1px solid var(--line);background:transparent;color:var(--ink);padding:6px 10px;min-height:38px;border-radius:2px;font:14px/1.2 var(--font-b);cursor:pointer;text-align:left}
+.tg i{font:12px var(--font-m);font-style:normal;color:var(--ink-soft);margin-left:4px}
+.tg.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.tg.on i{color:var(--paper)}
+.result{display:flex;align-items:center;gap:14px;border:2px solid var(--ink);background:var(--paper);padding:10px 12px}
+.need{font:400 46px/1 var(--font-m);flex:none}
+.rollout{font-size:14px}
+
+/* lists */
+.card{border-top:1px solid var(--line);padding:12px;display:grid;gap:10px}
+.card:first-child{border-top:0}
+.card h3{font-size:16px;overflow-wrap:anywhere}
+.ammo{font-size:22px}
+.rounds{font:13px/1.2 var(--font-m);letter-spacing:1px;overflow-wrap:anywhere;color:var(--ink-soft)}
+.empty{padding:14px 12px;color:var(--ink-soft)}
+.irow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}
+.irow:first-child{border-top:0}
+.irow .nm{flex:1 1 11em;min-width:0;display:grid;gap:2px}
+.irow .nm b{overflow-wrap:anywhere}
+.irow.zero .nm{color:var(--ink-soft)}
+.iw{width:5.2em;text-align:right;flex:none;font-size:13px}
+.addf{padding:12px;border-top:1px solid var(--line);display:grid;gap:8px;background:var(--box-2)}
+.prot{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;text-align:center}
+.prot.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.prot div{border:1px solid var(--line);padding:6px 2px;min-width:0}
+.prot b{display:block;font:400 22px/1.1 var(--font-m)}
+.prot span{font:500 10px/1.2 var(--font-d);text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);overflow-wrap:anywhere}
+.abn{font-size:18px}
+.ref{padding:12px;display:grid;gap:12px}
+.ref h3{font-size:14px}
+.ref ul{margin:0;padding-left:18px;display:grid;gap:3px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border:1px solid var(--line);padding:5px 7px;text-align:left;vertical-align:top}
+th{font:500 11px/1.2 var(--font-d);text-transform:uppercase;letter-spacing:.07em;background:var(--box-2)}
+
+/* roster */
+.rt{padding-bottom:14px;border-bottom:2px solid var(--ink)}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:14px;align-items:start;padding-top:14px}
+.crow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px;border-top:1px solid var(--line)}
+.crow:first-child{border-top:0}
+.crow .nm{flex:1 1 12em;min-width:0;display:grid;gap:2px}
+.crow h3{font-size:18px;overflow-wrap:anywhere}
+
+/* wizard */
+.wtop{padding-bottom:12px}
+.wtop h1{font-size:clamp(26px,7vw,40px)}
+.steps{list-style:none;margin:12px 0 0;padding:0;display:flex}
+.steps li{flex:1 1 0;min-width:0;display:flex}
+.steps .tab{font-size:12px;min-height:36px}
+.steps li:first-child .tab{border-left-width:1px}
+.steps .done{background:var(--box-2)}
+.steps .tab span{display:none}
+@media (min-width:620px){ .steps .tab span{display:inline} }
+.wz{border:1px solid var(--line);background:var(--box);max-width:760px}
+.wz>h2{font-size:15px;padding:9px 12px 8px;background:var(--box-2);border-bottom:1px solid var(--line)}
+.wrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid var(--line)}
+.wrow .nm{display:grid;gap:2px;min-width:0}
+.wrow.has{background:var(--box-2)}
+.wgh{padding:10px 12px 6px;border-top:1px solid var(--line);background:var(--paper)}
+.wnav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--paper);border-top:2px solid var(--ink);display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.wnav .mid{flex:1 1 auto;min-width:0;text-align:center;font:13px/1.3 var(--font-m)}
+.wnav .mid b{font-weight:400;font-size:17px}
+.sum{display:grid;gap:4px}
+
+.sync{font:12px/1 var(--font-m);color:var(--ink-soft);white-space:nowrap}
+.sync::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:var(--ink-soft)}
+.s-ok::before{background:var(--ok)} .s-saving::before{background:var(--amber)} .s-err::before{background:var(--red)}
+.ro .addf{display:none}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:10px 14px;font:14px/1.35 var(--font-b);width:max-content;max-width:min(92vw,440px);z-index:20;border-radius:2px;text-align:center}
+@media (max-width:420px){ .big{font-size:34px} .btn{padding:0 8px} .av{font-size:34px} }
+</style>
+
+</head>
+<body>
+<div class="wrap"><div id="app"></div></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+(() => {
+"use strict";
+
+/* ---------- helpers ---------- */
+const $id = id => document.getElementById(id);
+const app = $id("app");
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const uid = () => Math.random().toString(36).slice(2, 9);
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+const num = (v, d = 0) => { if (v == null || String(v).trim() === "") return d; const n = Number(String(v).replace(",", ".").trim()); return Number.isFinite(n) ? n : d; };
+const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+const d10 = () => 1 + Math.floor(Math.random() * 10);
+const sign = v => (v >= 0 ? "+ " : "− ") + Math.abs(v);
+const kg = v => (Math.round(v * 10) / 10).toFixed(1).replace(".", ",");
+let toastT = 0;
+function toast(msg){ const t = $id("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 3600); }
+const IN_CLAUDE = !!(window.claude && typeof window.claude.use === "function");
+let DL = null;
+if (IN_CLAUDE) { try { window.claude.use("downloads").then(n => { DL = n; if (U.exp) renderAll(); }, () => {}); } catch (_) {} }
+
+/* ---------- the GM's rules as data ---------- */
+const ATTR_PTS = 16, SKILL_PTS = 18;
+const ATTRS = [
+  ["spr","Спритність","рух, скритність, ухилення","Швидкість і мобільність: скільки метрів за хід, скритність, ухилення, швидко дістати зброю."],
+  ["til","Тілобудова","здоров'я, сила, вантаж","Витривалість і сила: здоров'я (×5 + 10), удар у ближньому бою, вантаж (×10 кг)."],
+  ["spy","Сприйняття","виявлення, уважність","Уважність та інстинкти: помітити ворога, слід чи засідку."],
+  ["rea","Реакція","ініціатива","Рефлекси: хто ходить першим у бою."],
+  ["mud","Мудрість","знання, лікування","Інтелект і кмітливість: знання, медицина, складні задачі."]
+];
+const AK = ATTRS.map(a => a[0]);
+const AN = { spr:"зі Спритністю", til:"із Силою", spy:"зі Сприйняттям", rea:"з Реакцією", mud:"з Мудрістю" };
+const SKILLS = [
+  ["Бойові", [["pistols","Пістолети"],["rifles","Гвинтівки"],["heavy","Важка зброя"],["melee","Зброя ближнього бою","til"],["unarmed","Без зброї","til"]]],
+  ["Дипломатичні", [["barter","Бартер"],["deceit","Обман"],["persuade","Переконання"]]],
+  ["Професійні", [["medicine","Медицина","mud"],["repair","Ремонт"],["scavenge","Збиральництво"],["science","Наука"]]],
+  ["Фізичні", [["athletics","Атлетика","spr"],["survival","Виживання","spy"],["sleight","Спритність рук","spr"],["stealth","Скритність","spr"]]]
+];
+const SKN = {}; SKILLS.forEach(g => g[1].forEach(s => { SKN[s[0]] = s[1]; }));
+const RAD_STAGE = ["Безсимптомна","Початкова","Середня","Важка","Критична","Фатальна"];
+const RAD_FX = ["без ефекту","−1 Тілобудова","−1 Тілобудова, −1 Спритність","−1 Тілобудова, −1 Спритність, −1 Реакція","−2 Тілобудова, −2 Спритність, −1 Реакція","смерть"];
+const RAD_T = [[0,0,0],[1,0,0],[1,1,0],[1,1,1],[2,2,1],[0,0,0]];
+const MARKET = [
+  { g:"Медицина", n:"Антирад", w:0.1, p:400, fx:"antirad", d:"виводить 250 рад" },
+  { g:"Медицина", n:"Бинт", w:0.1, p:40, d:"+2 до Медицини проти кровотечі" },
+  { g:"Медицина", n:"Аптечка", w:0.5, p:300, uses:3, d:"+4 до лікування ран, 3 використання" },
+  { g:"Медицина", n:"Армійська аптечка", w:0.5, p:600, uses:3, d:"+8 до лікування ран, 3 використання" },
+  { g:"Медицина", n:"Наукова аптечка", w:0.5, p:800, uses:3, fx:"sci", d:"+8 до лікування, виводить 250 рад, 3 використання" },
+  { g:"Медицина", n:"Горілка «Козаки»", w:0.5, p:200, fx:"vodka", d:"виводить 100 рад, −1 до чотирьох характеристик" },
+  { g:"Їжа й вода", n:"Вода, 1 л", w:1, p:50, d:"денна норма" },
+  { g:"Їжа й вода", n:"Хліб", w:0.5, p:40, d:"пів раціону" },
+  { g:"Їжа й вода", n:"Ковбаса", w:0.3, p:40, d:"пів раціону" },
+  { g:"Їжа й вода", n:"Сніданок туриста", w:0.5, p:100, d:"повний раціон" },
+  { g:"Їжа й вода", n:"MRE", w:1, p:500, uses:5, d:"повний раціон, 5 порцій" },
+  { g:"Спорядження", n:"Спальник", w:1, p:200, d:"" },
+  { g:"Спорядження", n:"Протигаз", w:0.5, p:500, d:"фільтр міняти кожні 2 години" },
+  { g:"Спорядження", n:"Фільтр до протигаза", w:0, p:50, d:"на 2 години" },
+  { g:"Набої, 1 кг", ammo:true, cal:"7.62×54", pack:50, p:800 },
+  { g:"Набої, 1 кг", ammo:true, cal:"7.62×51 НАТО", pack:50, p:800 },
+  { g:"Набої, 1 кг", ammo:true, cal:"5.45×39", pack:60, p:800 },
+  { g:"Набої, 1 кг", ammo:true, cal:"5.56×45", pack:60, p:800 },
+  { g:"Набої, 1 кг", ammo:true, cal:"9×39", pack:60, p:800 },
+  { g:"Набої, 1 кг", ammo:true, cal:"9×18", pack:100, p:500 },
+  { g:"Набої, 1 кг", ammo:true, cal:"9×19", pack:100, p:500 },
+  { g:"Набої, 1 кг", ammo:true, cal:"12×70 дріб", pack:30, p:200 }
+];
+const mName = m => m.ammo ? "Набої " + m.cal + ", " + m.pack + " шт" : m.n;
+const GUNS = [
+  { n:"Макаров (ПМм)", skill:"pistols", mag:8, dmg:"к10", modes:"напівавтомат", w:0.5, cal:"9×18", p:500, note:"Коротка дистанція. Кожна 1 на к10 рахується за дві." },
+  { n:"Стєчкін (АПС)", skill:"pistols", mag:20, dmg:"к10", modes:"напівавтомат, автомат", w:1.5, cal:"9×18", p:1500, note:"Коротка дистанція." },
+  { n:"Фора-12м", skill:"pistols", mag:12, dmg:"к10", modes:"напівавтомат", w:0.5, cal:"9×18", p:1500, note:"Коротка дистанція. Ергономічна рукоятка." },
+  { n:"ПБ-1с", skill:"pistols", mag:8, dmg:"к10", modes:"напівавтомат", w:0.5, cal:"9×18", p:1000, note:"Коротка дистанція. Вбудований глушник." },
+  { n:"Walker P99", skill:"pistols", mag:16, dmg:"к10+1", modes:"напівавтомат", w:0.5, cal:"9×19", p:2000, nato:true, note:"Коротка дистанція. Ергономічна рукоятка." },
+  { n:"MP-5", skill:"rifles", mag:30, dmg:"к10+1", modes:"напівавтомат, автомат, по 3", w:2.5, cal:"9×19", p:2500, nato:true, note:"Коротка дистанція. Навичку уточни в майстра." },
+  { n:"Обріз", skill:"rifles", mag:2, dmg:"3к10", modes:"одиночний", w:2, cal:"12×70 дріб", p:2000, note:"Близька дистанція. Ігнорує 5 кінетичної броні зблизька і 3 на короткій. Навичку уточни в майстра." },
+  { n:"Ніж", skill:"melee", mag:0, dmg:"", modes:"", w:0.5, cal:"", p:1000, note:"На 10 при поцілюванні: +3 шкоди, і вся шкода повз кінетичну броню." },
+  { n:"Кастети", skill:"unarmed", mag:0, dmg:"к10", modes:"", w:0.5, cal:"", p:500, note:"" },
+  { n:"Шиповані кастети", skill:"unarmed", mag:0, dmg:"к10", modes:"", w:0.5, cal:"", p:800, note:"Може викликати кровотечу." }
+];
+
+/* ---------- character shape ---------- */
+const BLANK = {
+  v:2, cid:"",
+  id:{ callsign:"", name:"", role:"", age:"", looks:"", about:"" },
+  attrs:{ spr:1, til:1, spy:1, rea:1, mud:1 }, attrMod:{ spr:0, til:0, spy:0, rea:0, mud:0 },
+  skills:{}, zone:0, freeSkill:0, freeAttr:0,
+  hp:15, woundsTreated:false, bleed:0, rad:0, vodka:0, noSleep:0, noFood:0, noWater:0, conditions:"",
+  money:4000,
+  armor:{ name:"Шкіряна куртка", kin:2, acid:2, fire:2, elec:2, rad:0, w:3, countW:false, slots:1, mask:false },
+  weapons:[], items:[], artifacts:[], abilities:[], reroll:{ skill:"", bonus:2 },
+  notes:"", secret:"", createdAt:0, updatedAt:0
+};
+Object.keys(SKN).forEach(k => { BLANK.skills[k] = 0; });
+function migrate(d){
+  const s = clone(BLANK);
+  for (const k of Object.keys(d || {})) {
+    const v = d[k];
+    if (v && typeof v === "object" && !Array.isArray(v) && s[k] && typeof s[k] === "object" && !Array.isArray(s[k])) Object.assign(s[k], v);
+    else s[k] = v;
+  }
+  for (const k of ["weapons","items","artifacts","abilities"]) if (!Array.isArray(s[k])) s[k] = [];
+  for (const k of ["weapons","items","artifacts","abilities"]) s[k].forEach(x => { if (x && !x.id) x.id = uid(); });
+  s.v = 2; delete s.by;
+  return s;
+}
+
+/* ---------- storage: Firebase accounts and Firestore; this browser keeps only the unfinished wizard ---------- */
+const FB = { apiKey:"AIzaSyDKhsiI3dpmTyqxu5o-2bYCBdF0kO_sU4k", authDomain:"stalker-rpg-101a6.firebaseapp.com", projectId:"stalker-rpg-101a6", storageBucket:"stalker-rpg-101a6.firebasestorage.app", messagingSenderId:"978626005616", appId:"1:978626005616:web:a95c2ca37700d9ec24c2b5" };
+const LS = "zona.cloud.v1", LS_U = "zona.cloud.ui.v1", CID = uid();
+let DB = { active:null, draft:null };            // per browser: the sheet last opened, the unfinished wizard
+let ME = null;                                     // { uid, name } once signed in
+let CH = {};                                       // every sheet of the campaign: id -> { owner, ownerName, updatedAt, char }
+let MY = {};                                       // my own sheets as live objects, edited in place
+let SEC = { id:null, ready:false };                // private notes of the open sheet
+let auth = null, fs = null, unsub = null, secUnsub = null, authReady = false, chReady = false, fbErr = "", resume = true;
+let sync = "ok", pendingSaves = 0, secT = 0;
+const saveT = {};
+function load(){
+  try {
+    const d = JSON.parse(localStorage.getItem(LS) || "null");
+    if (d) { DB.active = d.active || null; DB.draft = d.draft && d.draft.d ? d.draft : null; }
+    if (DB.draft) { DB.draft.d = migrate(DB.draft.d); DB.draft.cart = DB.draft.cart || { m:{}, g:{} }; DB.draft.ab = DB.draft.ab || { name:"", text:"" }; }
+  } catch (_) {}
+}
+function persist(){ try { localStorage.setItem(LS, JSON.stringify(DB)); } catch (_) {} }
+const mine = id => !!(ME && CH[id] && CH[id].owner === ME.uid);
+const charOf = id => CH[id] ? (mine(id) && MY[id] ? MY[id] : CH[id].char) : null;
+const isRO = () => U.screen === "sheet" && !!S && !mine(S.cid);
+const RO_OK = { tab:1, menu:1, cs:1, ct:1, cstep:1, creset:1, roll:1, reroll:1 };
+const CALC0 = { skill:"rifles", shot:"aimed", sit:false, optic:false, colim:false, near:"far", cover:"0", tprone:false, vis:false, invis:false, lying:false, rounds:0, nato:false, jam:0, extra:0 };
+let U = { screen:"login", tab:"sheet", edit:false, calc:clone(CALC0), confirm:null, roll:null, exp:null };
+function loadUI(){ try { const u = JSON.parse(localStorage.getItem(LS_U) || "null"); if (u) { if (u.tab) U.tab = u.tab; if (u.calc) U.calc = Object.assign(clone(CALC0), u.calc); } } catch (_) {} }
+function saveUI(){ try { localStorage.setItem(LS_U, JSON.stringify({ tab:U.tab, calc:U.calc })); } catch (_) {} }
+let S = null; // the character on screen: the open sheet or the wizard's draft
+function touch(){
+  if (U.screen === "sheet" && S && mine(S.cid)) { S.updatedAt = Date.now(); queueSave(S.cid); }
+  else persist();
+}
+function setSync(s){ if (sync === s) return; sync = s; const el = app.querySelector('[data-sec="top"]'); if (el && S && U.screen === "sheet") paint(el, SECS.top(fx())); }
+function queueSave(id){ setSync("saving"); clearTimeout(saveT[id]); saveT[id] = setTimeout(() => saveChar(id), 900); }
+function saveChar(id){
+  const c = MY[id]; if (!c || !ME || !fs) return;
+  clearTimeout(saveT[id]);
+  const o = clone(c); delete o.secret;
+  pendingSaves++; setSync("saving");
+  fs.collection("chars").doc(id).set({ owner:ME.uid, ownerName:ME.name, by:CID, updatedAt:c.updatedAt || Date.now(), char:o }).then(
+    () => { pendingSaves = Math.max(0, pendingSaves - 1); if (!pendingSaves) setSync("ok"); },
+    err => { pendingSaves = Math.max(0, pendingSaves - 1); setSync("err"); toast(err && err.code === "permission-denied" ? "База відхилила запис: це не твоя картка." : "Не вдалося зберегти. Перевір інтернет."); });
+}
+function queueSecret(){
+  const id = S && S.cid; if (!id || !mine(id) || !SEC.ready) return;
+  clearTimeout(secT);
+  secT = setTimeout(() => {
+    const c = MY[id]; if (!c || !ME || !fs) return;
+    fs.doc("users/" + ME.uid + "/secrets/" + id).set({ text:String(c.secret || ""), updatedAt:Date.now() }).catch(() => toast("Особисті нотатки не збереглися. Перевір інтернет."));
+  }, 900);
+}
+function watchSecret(id){
+  if (secUnsub) { secUnsub(); secUnsub = null; }
+  SEC = { id, ready:false };
+  if (!id || !mine(id) || !fs) return;
+  secUnsub = fs.doc("users/" + ME.uid + "/secrets/" + id).onSnapshot(doc => {
+    if (doc.metadata.hasPendingWrites) return;
+    const typing = document.activeElement && document.activeElement.id === "f-secret";
+    const c = MY[id];
+    if (c && doc.exists && !(SEC.ready && typing)) c.secret = String((doc.data() || {}).text || "");
+    SEC.ready = true; renderAll();
+  }, () => { SEC.ready = true; renderAll(); });
+}
+function subscribe(){
+  if (unsub) { unsub(); unsub = null; }
+  chReady = false;
+  unsub = fs.collection("chars").onSnapshot(snap => {
+    const next = {};
+    snap.forEach(doc => {
+      const d = doc.data() || {}; if (!d.char || !d.owner) return;
+      const c = migrate(d.char); c.cid = doc.id;
+      next[doc.id] = { owner:d.owner, ownerName:d.ownerName || "Гравець", updatedAt:d.updatedAt || 0, char:c };
+      if (ME && d.owner === ME.uid) {
+        const local = MY[doc.id];
+        if (!local) MY[doc.id] = c;
+        else if (!doc.metadata.hasPendingWrites && d.by !== CID && (d.updatedAt || 0) > (local.updatedAt || 0)) { c.secret = local.secret || ""; MY[doc.id] = c; }
+      }
+    });
+    for (const id of Object.keys(MY)) if (!next[id]) delete MY[id];
+    CH = next; chReady = true; fbErr = "";
+    const found = !!(DB.active && charOf(DB.active));
+    if (resume && (found || !snap.metadata.fromCache)) { resume = false; if (found && U.screen === "roster") { go("sheet"); return; } }
+    if (U.screen === "sheet") { const c = DB.active ? charOf(DB.active) : null; if (!c) { toast("Цієї картки більше немає."); go("roster"); return; } S = c; }
+    renderAll();
+  }, err => { chReady = true; fbErr = err && err.code === "permission-denied" ? "База не дала доступу. Вийди й увійди ще раз." : "Немає зв'язку з базою. Перевір інтернет."; renderAll(); });
+}
+function signedOut(){
+  if (unsub) { unsub(); unsub = null; }
+  if (secUnsub) { secUnsub(); secUnsub = null; }
+  ME = null; CH = {}; MY = {}; chReady = false; resume = true; S = null;
+}
+function initCloud(){
+  if (typeof firebase === "undefined") { fbErr = "Не завантажилися бібліотеки Firebase. Перевір інтернет і онови сторінку."; authReady = true; return; }
+  try {
+    firebase.initializeApp(FB); auth = firebase.auth(); fs = firebase.firestore();
+    fs.enablePersistence({ synchronizeTabs:true }).catch(() => {});
+  } catch (_) { fbErr = "Не вдалося запустити Firebase. Онови сторінку."; authReady = true; return; }
+  auth.onAuthStateChanged(u => {
+    authReady = true;
+    if (u) { ME = { uid:u.uid, name:u.displayName || String(u.email || "").split("@")[0] || "Гравець" }; subscribe(); go("roster"); }
+    else { signedOut(); go("login"); }
+  });
+}
+
+/* ---------- transfer codes ---------- */
+const b64 = bytes => { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const unb64 = str => { const b = atob(str.replace(/-/g, "+").replace(/_/g, "/")); const out = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i); return out; };
+async function encode(obj){
+  const json = JSON.stringify(obj);
+  try {
+    if (typeof CompressionStream === "function") {
+      const buf = await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer();
+      return "Z1." + b64(new Uint8Array(buf));
+    }
+  } catch (_) {}
+  return "Z0." + b64(new TextEncoder().encode(json));
+}
+async function decode(text){
+  const m = String(text).replace(/\s+/g, "").match(/Z([01])\.([A-Za-z0-9_-]+)/);
+  if (!m) throw new Error("fmt");
+  const bytes = unb64(m[2]);
+  if (m[1] === "0") return JSON.parse(new TextDecoder().decode(bytes));
+  if (typeof DecompressionStream !== "function") throw new Error("old");
+  const buf = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+  return JSON.parse(new TextDecoder().decode(buf));
+}
+const expObj = (c, noSecret) => { const o = clone(c); if (noSecret) o.secret = ""; return o; };
+
+/* ---------- derived values ---------- */
+const maxHp = () => S.attrs.til * 5 + 10;
+const skillCost = l => l * (l + 1) / 2;
+const skillSpent = c => Object.keys(SKN).reduce((s, k) => s + skillCost(num(c.skills[k])), 0);
+const attrSpent = c => AK.reduce((s, k) => s + num(c.attrs[k]), 0);
+function woundsAt(hp){ const max = maxHp(), lost = max - hp; return hp <= 0 ? 4 : lost >= max * .75 ? 3 : lost >= max * .5 ? 2 : lost >= max * .25 ? 1 : 0; }
+function setHp(v){ const max = maxHp(), before = woundsAt(S.hp); S.hp = clamp(Math.round(v), -max, max); if (woundsAt(S.hp) > before) S.woundsTreated = false; }
+function totalWeight(){
+  let w = 0;
+  for (const it of S.items) w += num(it.qty) * num(it.w);
+  for (const g of S.weapons) w += num(g.w);
+  if (S.armor.countW) w += num(S.armor.w);
+  return w;
+}
+function fx(){
+  const b = S.attrs, max = maxHp(), hp = S.hp, lost = max - hp;
+  let wounds = 0, state = "ok";
+  if (hp <= -max / 4) state = "dead";
+  else if (hp <= 0) state = "out";
+  else if (lost >= max * .75) wounds = 3;
+  else if (lost >= max * .5) wounds = 2;
+  else if (lost >= max * .25) wounds = 1;
+  const wEff = S.woundsTreated ? 0 : wounds;
+  const checkPen = wEff === 1 ? -1 : wEff >= 2 ? -2 : 0;
+  const lines = {}, halves = {};
+  for (const k of AK) { lines[k] = []; halves[k] = []; }
+  const A = (k, v, src) => { if (v) lines[k].push([src, v]); };
+  if (wEff === 2) for (const k of AK) A(k, -1, "рани");
+  if (wEff === 3) for (const k of AK) halves[k].push("рани");
+  const r = S.rad, rs = r >= 1000 ? 5 : r >= 800 ? 4 : r >= 500 ? 3 : r >= 300 ? 2 : r >= 100 ? 1 : 0;
+  A("til", -RAD_T[rs][0], "радіація"); A("spr", -RAD_T[rs][1], "радіація"); A("rea", -RAD_T[rs][2], "радіація");
+  if (S.vodka > 0) for (const k of ["mud","rea","spy","spr"]) A(k, -S.vodka, "горілка");
+  if (S.noSleep === 1) for (const k of AK) { if (k !== "til") A(k, -1, "без сну"); }
+  if (S.noSleep >= 2) for (const k of AK) A(k, k === "til" ? -1 : -2, "без сну");
+  A("til", -S.noFood, "голод"); A("til", -S.noWater, "спрага");
+  for (const k of AK) A(k, num(S.attrMod[k]), "інше");
+  const calc = k => { let v = num(b[k]) + lines[k].reduce((s, x) => s + x[1], 0); for (let i = 0; i < halves[k].length; i++) v = Math.ceil(v / 2); return Math.max(0, v); };
+  const eff = { til: calc("til") };
+  const weight = totalWeight(), cap = eff.til * 10;
+  const over = weight > cap * 1.5 ? 2 : weight > cap ? 1 : 0;
+  if (over) halves.spr.push("перевантаження");
+  for (const k of AK) if (k !== "til") eff[k] = calc(k);
+  const vodkaOut = S.vodka > 0 && ["mud","rea","spy","spr"].some(k => eff[k] <= 0);
+  const nextVodkaOut = ["mud","rea","spy","spr"].some(k => eff[k] - 1 <= 0);
+  if (rs === 5 || ((S.noFood > 0 || S.noWater > 0) && eff.til <= 0)) state = "dead";
+  if (state === "ok" && (vodkaOut || S.noSleep >= 3)) state = "out";
+  const label = state === "dead" ? "Смерть" : state === "out" ? "Без свідомості" : wounds === 0 ? "У строю" : wounds === 1 ? "Поранення" : "Поранення ×" + wounds;
+  const hpCls = state === "dead" || state === "out" || wounds >= 2 ? "bad" : wounds === 1 ? "warn" : "ok";
+  const wt = ["", "1 поранення: −1 до всіх перевірок.", "2 поранення: −1 до всіх характеристик, −2 до всіх перевірок.", "3 поранення: характеристики вдвічі менші, −2 до всіх перевірок."][wounds];
+  const woundText = wounds && S.woundsTreated ? wt + " Зараз знято лікуванням." : wt;
+  return { max, wounds, wEff, state, label, hpCls, checkPen, eff, lines, halves, rs, weight, cap, over, woundText, vodkaOut, nextVodkaOut };
+}
+function calcM(e){
+  const c = U.calc, sk = num(S.skills[c.skill]), parts = [[SKN[c.skill], sk]];
+  const P = (n, v) => parts.push([n, v]);
+  if (c.shot === "quick") P("швидкий постріл", -1);
+  if (c.shot === "aimed" && c.sit) P("сидячи", 1);
+  if (c.optic) P("оптика", 1);
+  if (c.colim) P("коліматор", 1);
+  if (String(c.near) === "10") P("ціль до 10 м", 1);
+  if (String(c.near) === "1") P("ціль до 1 м", 3);
+  if (String(c.cover) === "1") P("укриття ½", -1);
+  if (String(c.cover) === "3") P("укриття ¾", -3);
+  if (c.tprone) P("ціль лежить", -1);
+  if (S.armor.mask) P("протигаз", -1);
+  if (c.vis) P("погана видимість", -2);
+  if (c.invis) P("ціль невидима", -3);
+  if (c.lying) P("стрільба лежачи", -2);
+  if (c.rounds) P("раунди по цілі", c.rounds);
+  if (c.nato) P("зброя НАТО", 1);
+  if (c.jam) P("заклинювання", -c.jam);
+  if (c.extra) P("інше", c.extra);
+  if (e.checkPen) P("рани", e.checkPen);
+  const M = parts.reduce((s, x) => s + x[1], 0);
+  const rr = S.reroll || {}, rb = num(rr.bonus);
+  const eye = !!rr.skill && rb > 0 && (rr.skill === "any" || rr.skill === c.skill);
+  const p = clamp((M + 2) / 10, 0, 1);
+  const p2 = eye ? p + (1 - p) * clamp((M + 2 + rb) / 10, 0, 1) : p;
+  return { parts, M, need: 9 - M, p, p2, eye, rb };
+}
+
+/* ---------- small builders ---------- */
+const btn = (a, label, arg, cls, title, dis) => `<button type="button" class="btn ${cls || ""}" id="b-${a}-${esc(arg == null ? "" : arg)}" data-a="${a}" data-arg="${esc(arg == null ? "" : arg)}"${title ? ` title="${esc(title)}" aria-label="${esc(title)}"` : ""}${dis ? " disabled" : ""}>${label}</button>`;
+const stepper = (path, val) => `<span class="step">${btn("dec", "−", path, "sq", "Менше")}<output>${esc(val)}</output>${btn("inc", "+", path, "sq", "Більше")}</span>`;
+const cstep = (key, val) => `<span class="step">${btn("cstep", "−", key + "=-1", "sq", "Менше")}<output>${val > 0 ? "+" + val : val}</output>${btn("cstep", "+", key + "=1", "sq", "Більше")}</span>`;
+const wstep = (a, key, val, canDec, canInc) => `<span class="step">${btn(a, "−", key + "=-1", "sq", "Менше", !canDec)}<output>${val}</output>${btn(a, "+", key + "=1", "sq", "Більше", !canInc)}</span>`;
+const field = (path, val, o) => { o = o || {}; return `<input id="f-${path}" class="in" data-f="${path}"${o.n ? ' data-t="n" inputmode="decimal"' : ""} value="${esc(val)}"${o.ph ? ` placeholder="${esc(o.ph)}"` : ""}>`; };
+const area = (path, val, rows, ph) => `<textarea id="f-${path}" class="in" data-f="${path}" rows="${rows || 2}"${ph ? ` placeholder="${esc(ph)}"` : ""}>${esc(val)}</textarea>`;
+const lab = (name, inner, wide) => `<label class="fl${wide ? " wide" : ""}"><span>${name}</span>${inner}</label>`;
+const tg = (a, arg, on, text, mod) => `<button type="button" class="tg${on ? " on" : ""}" id="b-${a}-${esc(arg)}" data-a="${a}" data-arg="${esc(arg)}" aria-pressed="${on ? "true" : "false"}">${text}${mod ? `<i>${mod}</i>` : ""}</button>`;
+const delBtn = path => btn("del", U.confirm === path ? "Видалити?" : "×", path, "sm" + (U.confirm === path ? " dng" : ""), "Видалити");
+const TREFOIL = `<svg class="tre" viewBox="-12 -12 24 24" aria-hidden="true"><g fill="currentColor"><circle r="2.3"/><path d="M9.53-5.5A11 11 0 0 1 9.53 5.5L3.46 2A4 4 0 0 0 3.46-2Z" transform="rotate(90)"/><path d="M9.53-5.5A11 11 0 0 1 9.53 5.5L3.46 2A4 4 0 0 0 3.46-2Z" transform="rotate(210)"/><path d="M9.53-5.5A11 11 0 0 1 9.53 5.5L3.46 2A4 4 0 0 0 3.46-2Z" transform="rotate(330)"/></g></svg>`;
+const SYNC = { ok:"Збережено", saving:"Зберігаю", err:"Не збережено" };
+const TABN = [["sheet","Картка"],["combat","Бій"],["pack","Рюкзак"],["notes","Нотатки"]];
+const TABS = { sheet:["hp","env","rolls","attrs","skills","abil","ident"], combat:["calc","guns","armor","acts"], pack:["money","carry","items","arts"], notes:["notes","secret","ref"] };
+const tabBtns = () => TABN.map(t => `<button type="button" class="tab${U.tab === t[0] ? " on" : ""}" data-a="tab" data-arg="${t[0]}"${U.tab === t[0] ? ' aria-current="page"' : ""}>${t[1]}</button>`).join("");
+const WSTEPS = ["Хто","Характеристики","Навички","Спорядження","Підсумок"];
+const RR_OPT = [["","немає"],["rifles","гвинтівки"],["pistols","пістолети"],["heavy","важка зброя"],["any","будь-яка зброя"]];
+const dateStr = t => { if (!t) return ""; const d = new Date(t), p = n => String(n).padStart(2, "0"); return p(d.getDate()) + "." + p(d.getMonth() + 1) + "." + d.getFullYear(); };
+
+/* ---------- wizard helpers ---------- */
+function cartTotals(w){
+  let cost = 0, weight = 0;
+  for (const i in w.cart.m) { const m = MARKET[i], q = num(w.cart.m[i]); if (m && q) { cost += m.p * q; weight += (m.ammo ? 1 : m.w) * q; } }
+  for (const i in w.cart.g) { const g = GUNS[i], q = num(w.cart.g[i]); if (g && q) { cost += g.p * q; weight += g.w * q; } }
+  return { cost, weight };
+}
+function pushGun(g){ S.weapons.push({ id:uid(), name:g.n, skill:g.skill, dmg:g.dmg || "", mag:g.mag || 0, cur:g.mag || 0, modes:g.modes || "", w:g.w || 0, cal:g.cal || "", nato:!!g.nato, jams:0, note:g.note || "" }); }
+function addItem(m){
+  if (m.ammo) {
+    const it = S.items.find(x => x.ammo && x.cal === m.cal);
+    if (it) it.qty = num(it.qty) + m.pack;
+    else S.items.push({ id:uid(), name:"Набої " + m.cal, qty:m.pack, w:Math.round(10000 / m.pack) / 10000, cal:m.cal, ammo:true, note:"" });
+    return;
+  }
+  const it = S.items.find(x => x.name === m.n);
+  if (it) { it.qty = num(it.qty) + 1; if (m.uses && !(num(it.uses) > 0)) it.uses = m.uses; return; }
+  const o = { id:uid(), name:m.n, qty:1, w:m.w, note:m.d || "" };
+  if (m.uses) { o.uses = m.uses; o.max = m.uses; }
+  if (m.fx) o.fx = m.fx;
+  S.items.push(o);
+}
+function useCharge(it){
+  it.uses = num(it.uses, 1) - 1;
+  if (it.uses <= 0) { it.qty = Math.max(0, num(it.qty) - 1); it.uses = it.qty > 0 ? num(it.max, 3) : 0; }
+}
+
+/* ---------- sections ---------- */
+const SECS = {
+  /* sign-in and roster */
+  login(){
+    return `<header class="rt"><div class="formno">Настільна гра по Зоні · правила майстра</div><h1>Чарнік сталкера</h1></header>
+      <div class="rgrid">
+      <section class="box"><h2>Вхід</h2><div class="pad">${fbErr ? `<div class="neg">${fbErr}</div>` : !authReady ? `<p class="hint">Перевіряю вхід.</p>` : `<p>Увійди через Google, щоб створити свого сталкера. Картка зберігається в базі й відкривається з будь-якого пристрою.</p><div>${btn("signin", "Увійти через Google", "", "pri lg")}</div><p class="hint">Якщо сторінка відкрилася всередині Telegram чи іншого застосунку, відкрий її у звичайному браузері: там Google не дає входити.</p>`}</div></section>
+      <section class="box"><h2>Як це працює</h2><div class="ref"><ul>
+        <li>Майстер створення веде за правилами: 16 балів характеристик, 18 балів навичок, 4000 купонів на спорядження.</li>
+        <li>У картці є здоров'я з пораненнями, радіація, калькулятор пострілу, зброя, рюкзак і нотатки.</li>
+        <li>Свою картку змінюєш тільки ти. Картки інших гравців видно всім учасникам, але лише для читання.</li>
+        <li>Особисті нотатки бачиш тільки ти.</li></ul></div></section></div>`;
+  },
+  rost(){
+    const all = Object.keys(CH).map(id => ({ id, m:CH[id], c:charOf(id) })).filter(x => x.c).sort((a, b) => String(a.c.id.callsign).localeCompare(String(b.c.id.callsign), "uk"));
+    const row = (x, own) => {
+      const c = x.c, max = num(c.attrs.til) * 5 + 10, dk = "char." + x.id;
+      return `<div class="crow"><div class="nm"><h3>«${esc(c.id.callsign || "Без позивного")}»</h3><span class="hint">${[own ? "" : "гравець: " + x.m.ownerName, c.id.role, "ОЗ " + c.hp + "/" + max].filter(Boolean).map(esc).join(" · ")}</span></div>
+        ${btn("open", own ? "Відкрити" : "Переглянути", x.id, own ? "pri" : "")}${own ? btn("exp", "Код", x.id, "", "Код-копія персонажа") + btn("delchar", U.confirm === dk ? "Видалити?" : "×", x.id, U.confirm === dk ? "dng" : "", "Видалити персонажа") : ""}</div>`;
+    };
+    const my = all.filter(x => mine(x.id)), others = all.filter(x => !mine(x.id));
+    const wait = `<p class="empty">Завантажую картки.</p>`;
+    let expBox = "";
+    const ec = U.exp ? charOf(U.exp.cid) : null;
+    if (ec) expBox = `<section class="box"><h2>Код-копія «${esc(ec.id.callsign)}»</h2><div class="pad">
+      <textarea id="exp-code" class="in code" readonly aria-label="Код персонажа">${esc(U.exp.code || "Готую код.")}</textarea>
+      <div class="row wrapg">${btn("copy", "Скопіювати код", "", "pri")}${btn("file", "Зберегти файл", "")}${btn("expclose", "Закрити", "")}</div>
+      <label class="chk"><input type="checkbox" id="exp-nosec"${U.exp.noSecret ? " checked" : ""}> Без особистих нотаток</label>
+      <p class="hint">Це запасна копія всієї картки. З коду можна створити такого самого персонажа.</p></div></section>`;
+    return `<header class="rt top"><div class="who"><div class="formno">Настільна гра по Зоні · правила майстра</div><h1>Чарнік сталкера</h1></div>
+      <div class="top-r"><span class="sync s-ok">${esc(ME ? ME.name : "")}</span>${btn("signout", "Вийти", "", "sm")}</div></header>
+      ${fbErr ? `<div class="warnbar" style="margin-top:12px">${fbErr}</div>` : ""}
+      <div class="rgrid">
+      <section class="box"><h2>Мої сталкери</h2><div>${!chReady ? wait : my.map(x => row(x, true)).join("") || `<p class="empty">У тебе ще немає сталкера. Створи його за правилами майстра: 16 балів характеристик, 18 балів навичок і 4000 купонів на спорядження.</p>`}
+        <div class="addf"><div class="row wrapg">${btn("newChar", "Новий персонаж", "", "pri lg")}${DB.draft ? btn("cont", "Продовжити створення", "", "lg") : ""}</div></div></div></section>
+      <section class="box"><h2>Сталкери групи</h2><div>${!chReady ? wait : others.map(x => row(x, false)).join("") || `<p class="empty">Інших карток поки немає. Вони з'являться тут, коли гравці створять своїх сталкерів.</p>`}</div></section>
+      ${expBox}
+      <section class="box"><h2>Створити з коду</h2><div class="pad"><textarea id="imp-code" class="in code" data-keep aria-label="Код персонажа" placeholder="Встав сюди код-копію персонажа"></textarea>
+        <div class="row wrapg">${btn("imp", "Створити з коду", "", "pri")}<label class="btn" style="display:inline-flex;align-items:center">З файлу<input type="file" id="imp-file" accept=".json,.txt,application/json,text/plain" hidden></label></div>
+        <p class="hint">З коду створюється новий персонаж, і він стає твоїм.</p></div></section></div>`;
+  },
+
+  /* wizard */
+  wtop(){
+    const st = DB.draft.step;
+    return `<div class="formno">Новий сталкер · крок ${st + 1} з 5</div><h1>${WSTEPS[st]}</h1>
+      <ol class="steps">${WSTEPS.map((n, i) => `<li><button type="button" class="tab${i === st ? " on" : i < st ? " done" : ""}" data-a="wgo" data-arg="${i}"${i === st ? ' aria-current="step"' : ""} aria-label="Крок ${i + 1}: ${n}">${i + 1}<span>. ${n}</span></button></li>`).join("")}</ol>`;
+  },
+  wz(){
+    const w = DB.draft, d = w.d, st = w.step;
+    if (st === 0) return `<h2>Хто йде в Зону</h2><div class="pad">
+      <p class="hint">Обов'язковий тільки позивний. Решту можна дописати вже в картці.</p>
+      <div class="fgrid">${lab("Позивний", field("id.callsign", d.id.callsign, { ph:"Як звуть у Зоні" }))}${lab("Ім'я", field("id.name", d.id.name, { ph:"Необов'язково" }))}${lab("Заняття", field("id.role", d.id.role, { ph:"Механік, науковиця, мисливець" }))}${lab("Вік", field("id.age", d.id.age))}
+        ${lab("Зовнішність", area("id.looks", d.id.looks, 2), true)}${lab("Коротко про себе", area("id.about", d.id.about, 3), true)}</div>
+      <div class="sep"></div>
+      <div class="lbl">Здібність від майстра, якщо він її вже дав</div>
+      <div class="fgrid">${lab("Назва", field("$ab.name", w.ab.name), true)}${lab("Що робить", area("$ab.text", w.ab.text, 2), true)}</div></div>`;
+    if (st === 1) {
+      const left = ATTR_PTS - attrSpent(d);
+      return `<h2>Розподіли 16 балів</h2><div><div class="pad"><p class="hint">Кожна характеристика від 1 до 6. Її додають до к10 у перевірках.</p>
+        <div class="prot four"><div><b>${d.attrs.til * 5 + 10}</b><span>Здоров'я</span></div><div><b>${d.attrs.til * 10}</b><span>Вантаж, кг</span></div><div><b>${3 + d.attrs.spr}</b><span>Рух, м</span></div><div><b>+${d.attrs.rea}</b><span>Ініціатива</span></div></div></div>
+        ${ATTRS.map(a => `<div class="wrow"><div class="nm"><b>${a[1]}</b><span class="hint">${a[3]}</span></div>${wstep("wattr", a[0], d.attrs[a[0]], d.attrs[a[0]] > 1, d.attrs[a[0]] < 6 && left > 0)}</div>`).join("")}</div>`;
+    }
+    if (st === 2) {
+      const left = SKILL_PTS - skillSpent(d);
+      return `<h2>Розподіли 18 балів</h2><div><div class="pad"><p class="hint">Рівень коштує стільки балів, який він за номером: перший 1, другий ще 2, третій ще 3. П'ятий рівень разом коштує 15.</p></div>
+        ${SKILLS.map(g => `<div class="wgh lbl">${g[0]}</div>` + g[1].map(s => { const l = num(d.skills[s[0]]); return `<div class="wrow${l ? " has" : ""}"><div class="nm"><b>${s[1]}</b><span class="hint num">наступний рівень: ${l + 1} б.</span></div>${wstep("wskill", s[0], l, l > 0, l + 1 <= left)}</div>`; }).join("")).join("")}</div>`;
+    }
+    if (st === 3) {
+      const t = cartTotals(w), left = d.money - t.cost, cap = d.attrs.til * 10;
+      const row = (kind, i, name, meta, price) => { const q = num(w.cart[kind][i]); return `<div class="wrow${q ? " has" : ""}"><div class="nm"><b>${esc(name)}</b><span class="hint num">${price} куп.${meta ? " · " + esc(meta) : ""}</span></div>${wstep("wbuy", kind + "." + i, q, q > 0, price <= left)}</div>`; };
+      let html = "", grp = "";
+      MARKET.forEach((m, i) => { if (m.g !== grp) { grp = m.g; html += `<div class="wgh lbl">${grp}</div>`; } html += row("m", i, mName(m), m.ammo ? "" : [kg(m.w) + " кг", m.d].filter(Boolean).join(" · "), m.p); });
+      html += `<div class="wgh lbl">Зброя</div>` + GUNS.map((g, i) => row("g", i, g.n, [g.dmg ? "шкода " + g.dmg : "", g.mag ? "магазин " + g.mag : "", g.cal, kg(g.w) + " кг"].filter(Boolean).join(" · "), g.p)).join("");
+      return `<h2>Закупись на 4000 купонів</h2><div><div class="pad"><p class="hint">Шкіряна куртка, одяг і ПДА є в кожного, вони безкоштовні й ваги не мають. Невитрачені купони лишаються в кишені. Гвинтівок у списку майстра немає: свою зброю можна вписати вже в картці.</p>
+        <div class="prot four"><div><b>${fmt(left)}</b><span>Купонів</span></div><div><b class="${t.weight > cap ? "neg" : ""}">${kg(t.weight)}</b><span>Вага, кг</span></div><div><b>${cap}</b><span>Без штрафу</span></div><div><b>${kg(cap * 1.5)}</b><span>Межа</span></div></div></div>${html}</div>`;
+    }
+    const t = cartTotals(w), la = ATTR_PTS - attrSpent(d), ls = SKILL_PTS - skillSpent(d);
+    const sk = Object.keys(SKN).filter(k => num(d.skills[k]) > 0).map(k => SKN[k] + " " + d.skills[k]).join(", ") || "жодної";
+    const gear = [].concat(Object.keys(w.cart.m).filter(i => num(w.cart.m[i]) > 0).map(i => mName(MARKET[i]) + " ×" + w.cart.m[i]), Object.keys(w.cart.g).filter(i => num(w.cart.g[i]) > 0).map(i => GUNS[i].n + " ×" + w.cart.g[i])).join(", ") || "нічого";
+    return `<h2>Перевір і створи</h2><div class="pad">
+      <div class="sum"><div class="lbl">Сталкер</div><p><b>«${esc(d.id.callsign)}»</b>${d.id.role ? ", " + esc(d.id.role) : ""}${d.id.age ? ", " + esc(d.id.age) + " р." : ""}</p></div>
+      <div class="sum"><div class="lbl">Характеристики</div><p class="num">${ATTRS.map(a => a[1] + " " + d.attrs[a[0]]).join(", ")}</p>${la ? `<p class="amber">Не розподілено ${la} б. Вони збережуться як вільні бали.</p>` : ""}</div>
+      <div class="sum"><div class="lbl">Навички</div><p class="num">${esc(sk)}</p>${ls ? `<p class="amber">Не розподілено ${ls} б. Вони збережуться як вільні бали.</p>` : ""}</div>
+      <div class="sum"><div class="lbl">Спорядження</div><p>${esc(gear)}</p><p class="hint num">Лишається ${fmt(d.money - t.cost)} куп., вага ${kg(t.weight)} з ${d.attrs.til * 10} кг.</p></div>
+      ${w.ab.name.trim() ? `<div class="sum"><div class="lbl">Здібність</div><p><b>${esc(w.ab.name)}</b>${w.ab.text ? ". " + esc(w.ab.text) : ""}</p></div>` : ""}
+      <p class="hint">Після створення все можна змінити через кнопку «Правити». Бонуси від майстра додаються там само.</p></div>`;
+  },
+  wnav(){
+    const w = DB.draft, d = w.d, st = w.step;
+    let mid = "";
+    if (st === 1) mid = `лишилось балів <b>${ATTR_PTS - attrSpent(d)}</b>`;
+    else if (st === 2) mid = `лишилось балів <b>${SKILL_PTS - skillSpent(d)}</b>`;
+    else if (st === 3) mid = `купонів <b>${fmt(d.money - cartTotals(w).cost)}</b>`;
+    return `${st === 0 ? btn("wcancel", U.confirm === "wcancel" ? "Точно?" : "Скасувати", "", U.confirm === "wcancel" ? "dng" : "") : btn("wback", "Назад", "")}<div class="mid">${mid}</div>${st === 4 ? btn("wfinish", "Створити картку", "", "pri lg") : btn("wnext", "Далі", "", "pri lg")}`;
+  },
+
+  /* sheet frame */
+  top(e){
+    const own = mine(S.cid), m = CH[S.cid] || {};
+    const st = sync === "saving" && navigator.onLine === false ? "Без мережі, збережеться потім" : SYNC[sync];
+    return `<div class="who"><div class="formno">Облікова картка сталкера${own ? "" : " · гравець " + esc(m.ownerName || "")}</div><h1>«${esc(S.id.callsign || "Без позивного")}»</h1><div class="sub">${[S.id.role, S.id.age ? S.id.age + " р." : ""].filter(Boolean).map(esc).join(", ")}</div></div>
+      <div class="top-r"><span class="stamp st-${e.hpCls}">${e.label}</span><span class="sync s-${own ? sync : "ro"}">${own ? st : "Лише перегляд"}</span><div class="row">${btn("menu", "Персонажі", "", "sm")}${own ? btn("edit", U.edit ? "Готово" : "Правити", "", "sm" + (U.edit ? " pri" : "")) : ""}</div></div>`;
+  },
+  stick(e){
+    const pct = clamp(S.hp / e.max * 100, 0, 100);
+    return `<div class="vit num"><span><b>${S.hp}</b>/${e.max} ОЗ</span><span class="bar mini ${e.hpCls}" aria-hidden="true"><i style="width:${pct}%"></i></span><span class="amber">${TREFOIL}<span><b>${S.rad}</b> рад</span></span><span><b>${fmt(S.money)}</b> куп.</span>${e.checkPen ? `<span class="neg">${e.checkPen} до перевірок</span>` : ""}</div>
+      <nav class="tabs" aria-label="Розділи">${tabBtns()}</nav>`;
+  },
+  nav(){ return tabBtns(); },
+
+  /* sheet: card tab */
+  hp(e){
+    const pct = clamp(S.hp / e.max * 100, 0, 100);
+    const th = [1, 2, 3].map(k => Math.floor(e.max * (1 - .25 * k)));
+    const arm = S.armor;
+    const types = [["kin","кінетика, броня " + num(arm.kin)],["none","повз броню"],["acid","кислота, броня " + num(arm.acid)],["fire","вогонь, броня " + num(arm.fire)],["elec","електрика, броня " + num(arm.elec)]];
+    return `<h2>Здоров'я</h2><div class="pad">
+      <div class="row between end">
+        <div class="big ${e.hpCls}">${S.hp}<small>/${e.max}</small></div>
+        <div class="btns">${btn("hp", "−5", "-5")}${btn("hp", "−1", "-1")}${btn("hp", "+1", "1")}${btn("hp", "+5", "5")}</div>
+      </div>
+      <div class="bar ${e.hpCls}" role="img" aria-label="Здоров'я ${S.hp} з ${e.max}"><i style="width:${pct}%"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></div>
+      <div class="hint">Поранення: перше від ${th[0]} ОЗ, друге від ${th[1]}, третє від ${th[2]}. Непритомність на 0, смерть на −${Math.ceil(e.max / 4)}.</div>
+      ${e.woundText ? `<div class="neg">${e.woundText}</div>` : ""}
+      ${e.wounds ? `<label class="chk"><input type="checkbox" id="f-woundsTreated" data-f="woundsTreated" data-t="b"${S.woundsTreated ? " checked" : ""}> Рани оброблено, штрафи зняті до нової чверті втрат</label>` : ""}
+      <div class="row wrapg"><input id="dmg-n" class="in w4 num" data-keep data-enter="dmg" inputmode="numeric" placeholder="0" aria-label="Скільки шкоди">
+        <select id="dmg-t" class="in" data-keep aria-label="Тип шкоди">${types.map(t => `<option value="${t[0]}">${t[1]}</option>`).join("")}</select>
+        ${btn("dmg", "Отримати шкоду", "", "dng")}</div>
+      <div class="kv"><span>Кровотеча, раундів</span><span class="row">${S.bleed > 0 ? btn("bleedTick", "Раунд: −1 ОЗ", "", "dng sm") : ""}${stepper("bleed", S.bleed)}</span></div>
+    </div>`;
+  },
+  env(e){
+    return `<h2>Радіація й побут</h2><div class="pad">
+      <div class="row between end">
+        <div class="big amber">${S.rad}<small> рад</small></div>
+        <div class="btns">${btn("rad", "−25", "-25")}${btn("rad", "−1", "-1")}${btn("rad", "+5", "5")}${btn("rad", "+10", "10")}${btn("rad", "+25", "25")}</div>
+      </div>
+      <div class="bar rad" role="img" aria-label="Радіація ${S.rad} з 1000 рад"><i style="width:${clamp(S.rad / 10, 0, 100)}%"></i><b style="left:10%"></b><b style="left:30%"></b><b style="left:50%"></b><b style="left:80%"></b></div>
+      <div class="${e.rs ? "neg" : "hint"}">Стадія: ${RAD_STAGE[e.rs].toLowerCase()}, ${RAD_FX[e.rs]}.</div>
+      <div class="sep"></div>
+      <div class="kv"><span>Горілка в крові, пляшок</span>${stepper("vodka", S.vodka)}</div>
+      ${e.vodkaOut ? `<div class="neg">Характеристика впала до 0: непритомність. Щогодини повертається по 1.</div>` : S.vodka > 0 && e.nextVodkaOut ? `<div class="hint">Ще одна пляшка зведе характеристику до 0.</div>` : ""}
+      <div class="kv"><span>Без сну, діб</span>${stepper("noSleep", S.noSleep)}</div>
+      <div class="kv"><span>Без їжі, днів</span>${stepper("noFood", S.noFood)}</div>
+      <div class="kv"><span>Без води, днів</span>${stepper("noWater", S.noWater)}</div>
+      ${lab("Травми й ускладнення", field("conditions", S.conditions, { ph:"Наприклад: поранена ліва нога, рух −2 м" }))}
+    </div>`;
+  },
+  attrs(e){
+    return `<h2>Характеристики</h2><div>` + ATTRS.map(a => {
+      const k = a[0], base = num(S.attrs[k]), v = e.eff[k];
+      const chips = e.lines[k].map(x => `<span class="chip ${x[1] < 0 ? "neg" : "pos"}">${x[0]} ${x[1] > 0 ? "+" : "−"}${Math.abs(x[1])}</span>`).join("") + e.halves[k].map(h => `<span class="chip neg">${h} ÷2</span>`).join("");
+      return `<div class="arow"><div class="an"><h3>${a[1]}</h3><div class="hint">${a[2]}</div>${chips ? `<div class="chips">${chips}</div>` : ""}
+        ${U.edit ? `<div class="edrow"><span>база</span>${stepper("attrs." + k, base)}<span>артефакти й інше</span>${stepper("attrMod." + k, S.attrMod[k] > 0 ? "+" + S.attrMod[k] : S.attrMod[k])}</div>` : ""}</div>
+        <div class="av ${v < base ? "neg" : v > base ? "pos" : ""}">${v}${v !== base ? `<small>база ${base}</small>` : ""}</div></div>`;
+    }).join("") + `</div>`;
+  },
+  rolls(e){
+    const p = e.checkPen, sk = S.skills;
+    const det = Math.round(clamp((e.eff.spy + p + 5) / 10, 0, 1) * 100);
+    const mv = 3 + e.eff.spr;
+    const rows = [
+      ["Ініціатива", `к10 ${sign(e.eff.rea + p)}`],
+      ["Виявлення, треба 6+", `к10 ${sign(e.eff.spy + p)} · ${det}%`],
+      ["Ухилення", `к10 ${sign(e.eff.spr + num(sk.athletics) + p)}`],
+      ["Скрадання", `к10 ${sign(e.eff.spr + num(sk.stealth) + p)}`],
+      ["Рух / ривок / повзком", `${mv} / ${mv * 2} / ${e.eff.spr} м`],
+      ["Сила", String(e.eff.til)]
+    ];
+    return `<h2>Кидки й рух</h2><div class="pad">${rows.map(r => `<div class="kv"><span>${r[0]}</span><span class="num">${r[1]}</span></div>`).join("")}
+      ${p ? `<div class="neg">Рани дають ${p} до всіх перевірок. У цифрах вище це вже враховано.</div>` : ""}</div>`;
+  },
+  skills(e){
+    const p = e.checkPen;
+    const groups = SKILLS.map(g => `<div class="sg"><div class="lbl">${g[0]}</div>` + g[1].map(s => {
+      const k = s[0], lvl = num(S.skills[k]), attr = s[2];
+      const hint = lvl > 0 ? (attr ? `к10 ${sign(lvl + e.eff[attr] + p)} ${AN[attr]}` : `к10 ${sign(lvl + p)}`) : "";
+      return `<div class="srow${lvl ? "" : " zero"}"><span class="sn">${lvl ? `<b>${s[1]}</b>` : s[1]}${hint ? `<span class="sh hint num">${hint}</span>` : ""}</span>${U.edit ? stepper("skills." + k, lvl) : `<span class="pips" aria-hidden="true">${"●".repeat(Math.min(lvl, 6))}${"○".repeat(Math.max(0, 5 - lvl))}</span><span class="sv num">${lvl}</span>`}</div>`;
+    }).join("") + `</div>`).join("");
+    return `<h2>Навички</h2><div>${groups}
+      <div class="sg"><div class="kv"><span>Знання Зони</span>${stepper("zone", S.zone)}</div>
+      <div class="kv" style="margin-top:8px"><span>Вільні бали навичок</span>${stepper("freeSkill", S.freeSkill)}</div>
+      <div class="kv" style="margin-top:8px"><span>Вільні бали характеристик</span>${stepper("freeAttr", S.freeAttr)}</div>
+      ${U.edit ? `<div class="hint" style="margin-top:8px">Рівень N коштує N балів, рівні беруться по черзі.</div>` : ""}</div></div>`;
+  },
+  abil(){
+    const rr = S.reroll || { skill:"", bonus:2 };
+    const list = S.abilities.map(a => `<div class="card"><div class="row between"><h3 class="abn">${esc(a.name || "Без назви")}</h3>${U.edit ? delBtn("abilities." + a.id) : ""}</div>${a.text ? `<p>${esc(a.text)}</p>` : ""}
+      ${U.edit ? `<div class="fgrid">${lab("Назва", field("abilities." + a.id + ".name", a.name), true)}${lab("Що робить", area("abilities." + a.id + ".text", a.text, 2), true)}</div>` : ""}</div>`).join("");
+    const rrName = (RR_OPT.find(o => o[0] === rr.skill) || RR_OPT[0])[1];
+    return `<h2>Здібності</h2><div>${list || `<p class="empty">Здібностей поки немає. Майстер дає їх за передісторію.</p>`}
+      ${U.edit ? `<div class="addf">${btn("addAbil", "Додати здібність", "", "pri")}
+        <div class="lbl">Перекид промаху в калькуляторі пострілу</div>
+        <div class="row wrapg"><select id="f-reroll.skill" class="in" data-f="reroll.skill" aria-label="Для якої зброї">${RR_OPT.map(o => `<option value="${o[0]}"${rr.skill === o[0] ? " selected" : ""}>${o[1]}</option>`).join("")}</select><span class="row hint">бонус ${stepper("reroll.bonus", "+" + num(rr.bonus))}</span></div></div>`
+      : rr.skill ? `<div class="addf hint">Калькулятор пострілу рахує перекид промаху з +${num(rr.bonus)}: ${rrName}.</div>` : ""}</div>`;
+  },
+  ident(){
+    if (U.edit) return `<h2>Особова справа</h2><div class="pad"><div class="fgrid">${lab("Позивний", field("id.callsign", S.id.callsign))}${lab("Ім'я", field("id.name", S.id.name))}${lab("Заняття", field("id.role", S.id.role))}${lab("Вік", field("id.age", S.id.age))}${lab("Зовнішність", area("id.looks", S.id.looks, 2), true)}${lab("Коротко про себе", area("id.about", S.id.about, 3), true)}</div></div>`;
+    const rows = [["Позивний", S.id.callsign], ["Ім'я", S.id.name], ["Заняття", S.id.role], ["Вік", S.id.age]].filter(r => r[1]);
+    return `<h2>Особова справа</h2><div class="pad">${rows.map(r => `<div class="kv"><span class="lbl">${r[0]}</span><span>${esc(r[1])}</span></div>`).join("")}
+      ${S.id.looks ? `<div><div class="lbl">Зовнішність</div><p>${esc(S.id.looks)}</p></div>` : ""}${S.id.about ? `<div><div class="lbl">Про себе</div><p>${esc(S.id.about)}</p></div>` : ""}
+      ${!S.id.looks && !S.id.about ? `<p class="hint">Зовнішність і кілька слів про себе можна дописати через «Правити».</p>` : ""}</div>`;
+  },
+
+  /* sheet: combat tab */
+  calc(e){
+    const c = U.calc, m = calcM(e), sk = S.skills;
+    const pc = v => Math.round(v * 100) + "%";
+    const needTxt = m.need <= 1 ? "1+" : m.need > 10 ? "—" : m.need + "+";
+    const verdict = m.need <= 1 ? "Влучає завжди." : m.need > 10 ? "Таким кидком не влучити." : `на к10 · <b>${pc(m.p)}</b>`;
+    const formula = "к10 " + m.parts.map(x => `${sign(x[1])} (${x[0]})`).join(" ") + ` = к10 ${sign(m.M)}, влучає на 9+`;
+    let out = "";
+    const o = U.roll;
+    if (o) {
+      out = `Випало ${o.r}: ${o.r} ${sign(o.M)} = ${o.r + o.M}. ${o.hit ? "<b class='pos'>Влучання.</b>" : "<b class='neg'>Промах.</b>"}`;
+      if (!o.hit && o.eye && o.r2 == null) out += " " + btn("reroll", "Перекинути з +" + o.rb, "", "pri sm");
+      if (o.r2 != null) out += ` Перекид, випало ${o.r2}: ${o.r2} ${sign(o.M + o.rb)} = ${o.r2 + o.M + o.rb}. ${o.hit2 ? "<b class='pos'>Влучання.</b>" : "<b class='neg'>Промах.</b>"}`;
+    }
+    return `<h2>Постріл</h2><div class="pad">
+      <div class="seg">${["rifles","pistols","heavy"].map(k => tg("cs", "skill=" + k, c.skill === k, SKN[k], String(num(sk[k])))).join("")}</div>
+      <div class="seg">${tg("cs", "shot=aimed", c.shot === "aimed", "Прицільний", "основна дія")}${tg("cs", "shot=quick", c.shot === "quick", "Швидкий", "−1")}</div>
+      <div class="seg">${tg("cs", "near=far", String(c.near) === "far", "Ціль далі 10 м")}${tg("cs", "near=10", String(c.near) === "10", "До 10 м", "+1")}${tg("cs", "near=1", String(c.near) === "1", "До 1 м", "+3")}</div>
+      <div class="seg">${tg("cs", "cover=0", String(c.cover) === "0", "Без укриття")}${tg("cs", "cover=1", String(c.cover) === "1", "Укриття ½", "−1")}${tg("cs", "cover=3", String(c.cover) === "3", "Укриття ¾", "−3")}</div>
+      <div class="seg">
+        ${c.shot === "aimed" ? tg("ct", "sit", c.sit, "Сидячи", "+1") : ""}
+        ${tg("ct", "optic", c.optic, "Оптика, від 50 м", "+1")}${tg("ct", "colim", c.colim, "Коліматор, до 50 м", "+1")}
+        ${tg("ct", "nato", c.nato, "Зброя НАТО", "+1")}
+        ${tg("ct", "lying", c.lying, "Лежачи", "−2")}${tg("ct", "tprone", c.tprone, "Ціль лежить", "−1")}
+        ${tg("ct", "vis", c.vis, "Туман, дощ", "−2")}${tg("ct", "invis", c.invis, "Ціль невидима", "−3")}
+        ${tg("mask", "", S.armor.mask, "Протигаз надіто", "−1")}
+      </div>
+      <div class="kv"><span>Раунди по тій самій цілі після першого</span>${cstep("rounds", c.rounds)}</div>
+      <div class="kv"><span>Зброя вже клинила, разів</span>${cstep("jam", c.jam)}</div>
+      <div class="kv"><span>Інший бонус чи штраф</span>${cstep("extra", c.extra)}</div>
+      <div class="result"><div class="need">${needTxt}</div><div>${verdict}${m.eye && m.need > 1 ? `<br>з перекидом +${m.rb}: <b>${pc(m.p2)}</b>` : ""}</div></div>
+      <div class="hint num">${formula}</div>
+      <div class="row wrapg">${btn("roll", "Кинути к10", "", "pri")}${btn("creset", "Скинути умови", "")}</div>
+      ${out ? `<div class="rollout">${out}</div>` : ""}
+    </div>`;
+  },
+  guns(){
+    const skOpts = [["rifles","Гвинтівки"],["pistols","Пістолети"],["heavy","Важка зброя"],["melee","Зброя ближнього бою"],["unarmed","Без зброї"]];
+    const list = S.weapons.map(g => {
+      const id = g.id, base = "weapons." + id, mag = num(g.mag), cur = clamp(num(g.cur), 0, mag), jams = num(g.jams);
+      const meta = [(SKN[g.skill] || "") + " " + num(S.skills[g.skill]), g.dmg ? "шкода " + esc(g.dmg) : "", esc(g.cal), esc(g.modes), kg(num(g.w)) + " кг", g.nato ? "НАТО +1" : ""].filter(Boolean).join(" · ");
+      return `<div class="card">
+        <div class="row between"><h3>${esc(g.name)}</h3>${delBtn(base)}</div>
+        <div class="hint num">${meta}</div>
+        ${mag > 0 ? `<div class="row wrapg"><span class="ammo num">${cur}/${mag}</span>${btn("shot", "Постріл −1", id)}${btn("reload", "Перезарядити", id, "pri")}</div>${mag <= 40 ? `<div class="rounds" aria-hidden="true">${"▮".repeat(cur)}${"▯".repeat(mag - cur)}</div>` : ""}
+          <div class="kv"><span>Клинила, разів</span>${stepper(base + ".jams", jams)}</div>${jams ? `<div class="neg">${jams >= 3 ? "Зброя непридатна до повного ремонту." : "−" + jams + " до влучності й шкоди."}</div>` : ""}` : ""}
+        ${g.note ? `<div class="hint">${esc(g.note)}</div>` : ""}
+        ${U.edit ? `<div class="fgrid">${lab("Назва", field(base + ".name", g.name), true)}
+          ${lab("Навичка", `<select id="f-${base}.skill" class="in" data-f="${base}.skill">${skOpts.map(o => `<option value="${o[0]}"${g.skill === o[0] ? " selected" : ""}>${o[1]}</option>`).join("")}</select>`)}
+          ${lab("Шкода", field(base + ".dmg", g.dmg, { ph:"2к10" }))}${lab("Магазин", field(base + ".mag", g.mag, { n:1 }))}${lab("Вага, кг", field(base + ".w", g.w, { n:1 }))}
+          ${lab("Калібр", field(base + ".cal", g.cal))}${lab("Режими вогню", field(base + ".modes", g.modes))}
+          ${lab("Нотатка", field(base + ".note", g.note), true)}
+          <label class="chk wide"><input type="checkbox" id="f-${base}.nato" data-f="${base}.nato" data-t="b"${g.nato ? " checked" : ""}> Зброя НАТО, +1 до влучання</label></div>` : ""}
+      </div>`;
+    }).join("");
+    return `<h2>Зброя</h2><div>${list || `<p class="empty">Зброї ще немає. Додай її зі списку майстра або впиши свою.</p>`}
+      <div class="addf"><div class="row wrapg"><select id="gun-sel" class="in" data-keep aria-label="Яку зброю додати"><option value="">Своя зброя</option>${GUNS.map((g, i) => `<option value="${i}">${esc(g.n)}, ${g.p} куп.</option>`).join("")}</select>${btn("addGun", "Додати", "", "pri")}</div>
+      <label class="chk"><input type="checkbox" id="gun-buy" data-keep> Купити: списати купони</label></div></div>`;
+  },
+  armor(){
+    const a = S.armor, radP = num(a.rad) + (a.mask ? 5 : 0);
+    const tiles = [["Кінетика", a.kin],["Кислота", a.acid],["Вогонь", a.fire],["Електрика", a.elec],["Радіація", radP]];
+    return `<h2>Броня</h2><div class="pad"><h3 style="font-size:16px">${esc(a.name)}</h3>
+      <div class="prot">${tiles.map(t => `<div><b>${num(t[1])}</b><span>${t[0]}</span></div>`).join("")}</div>
+      <div class="hint">Вага ${kg(num(a.w))} кг${a.countW ? "" : ", у вантаж не рахується"}. Контейнерів для артефактів: ${num(a.slots)}.</div>
+      <label class="chk"><input type="checkbox" id="f-armor.mask" data-f="armor.mask" data-t="b"${a.mask ? " checked" : ""}> Протигаз надіто: +5 від радіації, −1 до влучання</label>
+      ${U.edit ? `<div class="fgrid">${lab("Назва", field("armor.name", a.name), true)}${lab("Кінетика", field("armor.kin", a.kin, { n:1 }))}${lab("Кислота", field("armor.acid", a.acid, { n:1 }))}${lab("Вогонь", field("armor.fire", a.fire, { n:1 }))}${lab("Електрика", field("armor.elec", a.elec, { n:1 }))}${lab("Радіація", field("armor.rad", a.rad, { n:1 }))}${lab("Вага, кг", field("armor.w", a.w, { n:1 }))}${lab("Контейнери", field("armor.slots", a.slots, { n:1 }))}
+        <label class="chk wide"><input type="checkbox" id="f-armor.countW" data-f="armor.countW" data-t="b"${a.countW ? " checked" : ""}> Рахувати вагу броні у вантаж</label></div>` : `<p class="hint">Іншу броню можна вписати через «Правити».</p>`}
+    </div>`;
+  },
+  acts(e){
+    const qd = k => Math.round(clamp((num(S.skills[k]) + e.eff.spr) / 10, 0, 1) * 100);
+    return `<h2>Дії в бою</h2><div class="ref"><p>За хід: одна основна дія або дві додаткові, вільних скільки завгодно. Жодну дію не повторюють двічі за хід.</p>
+      <div><h3>Основні</h3><p class="hint">Прицільний постріл чи кидок, ривок, дістати гвинтівку, перезарядка, захват, зламати замок, використати інструмент, прицільний удар, ремонт зброї.</p></div>
+      <div><h3>Додаткові</h3><p class="hint">Швидкий постріл, рух, швидко вихопити гвинтівку, швидка перезарядка, дістати пістолет чи ніж, перша допомога, випити або вколоти, швидкий удар, швидкий кидок, швидкий ремонт.</p></div>
+      <div><h3>Вільні</h3><p class="hint">Помітити ворога, встати, сісти або впасти, швидко вихопити малу зброю, розмова.</p></div>
+      <div><h3>Швидке вихоплювання</h3><p class="hint num">к10 − Спритність має бути не більше за навичку зброї. Зараз: гвинтівка ${qd("rifles")}%, пістолет ${qd("pistols")}%.</p></div>
+      <p class="hint">Дія у відповідь: притримай дію і перерви хід того, в кого ініціатива нижча. Між раундами вона не зберігається.</p></div>`;
+  },
+
+  /* sheet: pack tab */
+  money(){
+    return `<h2>Купони</h2><div class="pad"><div class="big">${fmt(S.money)}<small> куп.</small></div>
+      <div class="row wrapg"><input id="money-amt" class="in w6 num" data-keep inputmode="numeric" placeholder="сума" aria-label="Сума">${btn("money", "+ Дохід", "1", "pri")}${btn("money", "− Витрата", "-1")}</div></div>`;
+  },
+  carry(e){
+    const lim = e.cap * 1.5, pct = clamp(e.weight / (lim || 1) * 100, 0, 100);
+    const cls = e.over === 2 ? "bad" : e.over === 1 ? "warn" : "";
+    const txt = e.over === 2 ? "Понад межу: стільки не понести." : e.over === 1 ? "Перевантаження: Спритність удвічі менша." : "Без штрафу.";
+    return `<h2>Вантаж</h2><div class="pad"><div class="row between end"><div class="big ${cls}">${kg(e.weight)}<small>/${e.cap} кг</small></div><div class="${e.over ? "neg" : "hint"}" style="text-align:right">${txt}</div></div>
+      <div class="bar ${cls}" role="img" aria-label="Вантаж ${kg(e.weight)} з ${e.cap} кг"><i style="width:${pct}%"></i><b style="left:66.67%"></b></div>
+      <div class="hint">До ${e.cap} кг без штрафу, до ${kg(lim)} кг зі Спритністю навпіл. Куртка, одяг і ПДА не рахуються.</div></div>`;
+  },
+  items(){
+    const list = S.items.map(it => {
+      const id = it.id, base = "items." + id, q = num(it.qty);
+      return `<div class="irow${q ? "" : " zero"}"><div class="nm"><b>${esc(it.name)}</b>${it.note ? `<span class="hint">${esc(it.note)}</span>` : ""}${it.uses != null ? `<span class="hint">використань у початому: ${num(it.uses)}</span>` : ""}</div>
+        ${stepper(base + ".qty", q)}<span class="iw num">${kg(q * num(it.w))} кг</span>
+        ${it.fx && q > 0 ? btn("use", "Вжити", id, "pri sm") : ""}${it.uses != null && !it.fx && q > 0 ? btn("charge", "Використати", id, "sm") : ""}${delBtn(base)}
+        ${U.edit ? `<div class="fgrid" style="flex:1 1 100%">${lab("Назва", field(base + ".name", it.name))}${lab("Вага однієї, кг", field(base + ".w", it.w, { n:1 }))}${lab("Нотатка", field(base + ".note", it.note), true)}</div>` : ""}</div>`;
+    }).join("");
+    const opts = MARKET.map((m, i) => `<option value="${i}">${esc(mName(m))}, ${m.p} куп.</option>`).join("");
+    return `<h2>Рюкзак</h2><div>${list || `<p class="empty">Рюкзак порожній. Додай речі зі списку майстра або впиши свої.</p>`}
+      <div class="addf"><div class="lbl">З ринку майстра</div><div class="row wrapg"><select id="mk-sel" class="in" data-keep aria-label="Що додати">${opts}</select>${btn("addMarket", "Додати", "", "pri")}</div>
+        <label class="chk"><input type="checkbox" id="mk-buy" data-keep> Купити: списати купони</label></div>
+      <div class="addf"><div class="lbl">Своя річ</div><div class="row wrapg"><input id="ci-name" class="in" data-keep data-enter="addCustom" placeholder="Назва" aria-label="Назва речі" style="flex:1 1 9em"><input id="ci-qty" class="in w4 num" data-keep inputmode="numeric" placeholder="шт" aria-label="Кількість"><input id="ci-w" class="in w4 num" data-keep inputmode="decimal" placeholder="кг" aria-label="Вага однієї, кг">${btn("addCustom", "Додати", "", "pri")}</div></div></div>`;
+  },
+  arts(){
+    const list = S.artifacts.map(a => `<div class="irow"><div class="nm"><b>${esc(a.name)}</b>${a.fx ? `<span class="hint">${esc(a.fx)}</span>` : ""}</div>${delBtn("artifacts." + a.id)}</div>`).join("");
+    return `<h2>Артефакти</h2><div>${list || `<p class="empty">Артефактів немає. У Зону з ними не заходять.</p>`}
+      <div class="addf"><div class="row wrapg"><input id="art-n" class="in" data-keep data-enter="addArt" placeholder="Назва" aria-label="Назва артефакту" style="flex:1 1 8em"><input id="art-fx" class="in" data-keep data-enter="addArt" placeholder="Що дає" aria-label="Ефект" style="flex:2 1 10em">${btn("addArt", "Додати", "", "pri")}</div>
+      <div class="hint">Контейнерів у броні: ${num(S.armor.slots)}. Зміну характеристик від артефакту внеси через «Правити», поле «артефакти й інше».</div></div></div>`;
+  },
+
+  /* sheet: notes tab */
+  notes(){
+    return `<h2>Нотатки</h2><div class="pad"><textarea id="f-notes" class="in ta" data-f="notes" aria-label="Нотатки" placeholder="Що сталося на сесії, імена, борги, домовленості.">${esc(S.notes)}</textarea></div>`;
+  },
+  secret(){
+    const ready = SEC.ready && SEC.id === S.cid;
+    return `<h2>Особисте</h2><div class="pad"><textarea id="f-secret" class="in ta" data-f="secret" aria-label="Особисті нотатки" placeholder="${ready ? "Таємниці персонажа, яких не знають інші гравці." : "Завантажую."}"${ready ? "" : " disabled"}>${esc(S.secret)}</textarea>
+      <div class="hint">Цей блок бачиш тільки ти. Іншим учасникам чарнік його не показує.</div></div>`;
+  },
+  ref(){
+    return `<h2>Шпаргалка</h2><div class="ref">
+      <div><h3>Поранення</h3><div class="tw"><table><tr><th>Втрачено</th><th>Ефект</th></tr><tr><td>¼ здоров'я</td><td>−1 до всіх перевірок</td></tr><tr><td>½</td><td>−1 до всіх характеристик, −2 до перевірок</td></tr><tr><td>¾</td><td>характеристики навпіл, −2 до перевірок</td></tr><tr><td>усе</td><td>непритомність</td></tr><tr><td>⁵⁄₄</td><td>смерть</td></tr></table></div></div>
+      <div><h3>Радіація</h3><div class="tw"><table><tr><th>Рад</th><th>Стадія</th><th>Ефект</th></tr>${[["0–99",0],["100–299",1],["300–499",2],["500–799",3],["800–999",4],["1000",5]].map(r => `<tr><td class="num">${r[0]}</td><td>${RAD_STAGE[r[1]]}</td><td>${RAD_FX[r[1]]}</td></tr>`).join("")}</table></div><p class="hint">У чистому місці минає 1 рад за пів години. Антирад виводить 250, горілка 100.</p></div>
+      <div><h3>Лікування</h3><ul><li>1 ОЗ відновлюється за 2 години, у спокої з доглядом за годину, у небезпеці за 4.</li><li>Перша допомога: к10 + Медицина проти 5, 9, 13 або 17 за кількістю ран. У підсумку правил стоять 14 і 18, уточни в майстра.</li><li>Бинт +2 проти кровотечі, аптечка +4, армійська й наукова +8.</li><li>Зупинити кровотечу: Медицина проти 4, додаткова дія.</li></ul></div>
+      <div><h3>Побут</h3><ul><li>День без їжі або води: −1 Тілобудова.</li><li>Доба без сну: −1 до всього, крім Тілобудови. Друга: −1 Тілобудова і −2 до решти. На третю персонаж падає й спить.</li><li>Пляшка горілки: −1 до Мудрості, Реакції, Сприйняття і Спритності, щогодини повертається по 1.</li></ul></div></div>`;
+  }
+};
+
+/* ---------- rendering ---------- */
+const dirty = new Set();
+function paint(el, html){
+  const keep = {};
+  el.querySelectorAll("[data-keep]").forEach(i => { if (i.id) keep[i.id] = i.type === "checkbox" ? i.checked : i.value; });
+  el.innerHTML = html;
+  for (const id in keep) { const i = $id(id); if (!i) continue; if (i.type === "checkbox") i.checked = keep[id]; else i.value = keep[id]; }
+  // someone else's sheet: everything that changes it is switched off
+  if (isRO() && !/^(top|stick|nav)$/.test(el.dataset.sec || "")) el.querySelectorAll("input,textarea,select,button[data-a]").forEach(n => { if (n.tagName !== "BUTTON" || !RO_OK[n.dataset.a]) n.disabled = true; });
+}
+const isField = el => !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && el.type !== "checkbox" && el.type !== "file";
+function renderAll(){
+  const e = (U.screen === "sheet" || U.screen === "wiz") && S ? fx() : null, act = document.activeElement;
+  const fid = act && act.tagName === "BUTTON" && act.id ? act.id : null;
+  const typing = isField(act) ? act : null;
+  app.querySelectorAll("[data-sec]").forEach(el => {
+    const name = el.dataset.sec;
+    if (typing && el.contains(typing)) { dirty.add(name); return; }
+    paint(el, SECS[name](e)); dirty.delete(name);
+  });
+  if (fid) { const n = $id(fid); if (n && n !== document.activeElement) n.focus({ preventScroll:true }); }
+}
+function flushDirty(){
+  if (!dirty.size) return;
+  const e = (U.screen === "sheet" || U.screen === "wiz") && S ? fx() : null, act = document.activeElement;
+  for (const name of Array.from(dirty)) {
+    const el = app.querySelector(`[data-sec="${name}"]`);
+    if (!el) { dirty.delete(name); continue; }
+    if (isField(act) && el.contains(act)) continue;
+    paint(el, SECS[name](e)); dirty.delete(name);
+  }
+}
+function build(){
+  if (!ME) U.screen = "login"; else if (U.screen === "login") U.screen = "roster";
+  if (U.screen === "wiz" && !DB.draft) U.screen = "roster";
+  if (U.screen === "sheet" && !(DB.active && charOf(DB.active))) U.screen = "roster";
+  if (!TABS[U.tab]) U.tab = "sheet";
+  let html, ro = false;
+  if (U.screen === "wiz") { S = DB.draft.d; html = `<header class="wtop" data-sec="wtop"></header><section class="wz" data-sec="wz"></section><div class="wnav" data-sec="wnav"></div>`; }
+  else if (U.screen === "sheet") {
+    S = charOf(DB.active); ro = !mine(DB.active); if (ro) U.edit = false;
+    html = `<header class="top" data-sec="top"></header><div class="stick" data-sec="stick"></div><main class="grid">${TABS[U.tab].filter(s => !(ro && s === "secret")).map(s => `<section class="box" data-sec="${s}"></section>`).join("")}</main><nav class="navb" data-sec="nav" aria-label="Розділи"></nav>`;
+  }
+  else { S = null; html = `<div data-sec="${U.screen === "login" ? "login" : "rost"}"></div>`; }
+  app.className = "sc-" + U.screen + (ro ? " ro" : ""); app.innerHTML = html; dirty.clear(); renderAll();
+}
+function setHash(h){ try { history.replaceState(null, "", h ? "#" + h : location.pathname + location.search); } catch (_) { try { location.hash = h || ""; } catch (__) {} } }
+function go(screen){
+  U.screen = screen; U.confirm = null; U.edit = false; build();
+  if (U.screen === "sheet") watchSecret(DB.active); else if (secUnsub) { secUnsub(); secUnsub = null; }
+  setHash(U.screen === "sheet" ? U.tab : ""); window.scrollTo(0, 0);
+}
+
+/* ---------- editing ---------- */
+function locate(path){
+  let p = path.split("."), o = S;
+  if (p[0] === "$ab") { o = DB.draft ? DB.draft.ab : null; p = p.slice(1); }
+  if (o == null) return null;
+  for (let i = 0; i < p.length - 1; i++) { o = Array.isArray(o) ? o.find(x => x.id === p[i]) : o[p[i]]; if (o == null) return null; }
+  return [o, p[p.length - 1]];
+}
+const LIM = [[/^attrs\./,1,12],[/^attrMod\./,-9,9],[/^skills\./,0,10],[/^zone$/,0,10],[/^free/,0,99],[/^bleed$/,0,60],[/^vodka$/,0,9],[/^noSleep$/,0,3],[/^noFood$/,0,9],[/^noWater$/,0,9],[/\.qty$/,0,9999],[/\.jams$/,0,3],[/^reroll\.bonus$/,0,9]];
+function step(path, d){
+  const loc = locate(path); if (!loc) return;
+  const lim = LIM.find(l => l[0].test(path)) || [0,-9999,9999];
+  loc[0][loc[1]] = clamp(num(loc[0][loc[1]]) + d, lim[1], lim[2]);
+  if (path === "attrs.til") S.hp = Math.min(S.hp, maxHp());
+}
+function setField(t){
+  const loc = locate(t.dataset.f); if (!loc) return;
+  if (t.dataset.t === "b") loc[0][loc[1]] = t.checked;
+  else if (t.dataset.t === "n") loc[0][loc[1]] = Math.max(0, num(t.value, 0));
+  else loc[0][loc[1]] = t.value;
+}
+const normCal = s => String(s || "").toLowerCase().replace(/[xх*]/g, "×").replace(/мм|\s/g, "");
+const val = id => { const el = $id(id); return el ? el.value : ""; };
+const clearVal = id => { const el = $id(id); if (el) el.value = ""; };
+function copyText(text, okMsg){
+  const fail = () => { const el = $id("exp-code"); if (el) { el.focus(); el.select(); } toast("Скопіювати не вдалося. Код виділено: скопіюй вручну."); };
+  try { navigator.clipboard.writeText(text).then(() => toast(okMsg), fail); } catch (_) { fail(); }
+}
+const ACT = {
+  /* account and roster */
+  signin(){
+    if (!auth) { toast("Firebase не запустився. Онови сторінку."); return "n"; }
+    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
+      const c = err && err.code;
+      if (c === "auth/popup-closed-by-user" || c === "auth/cancelled-popup-request") return;
+      toast(c === "auth/popup-blocked" ? "Браузер заблокував вікно входу. Дозволь спливні вікна для цього сайту." : c === "auth/unauthorized-domain" ? "Цю адресу ще не дозволено у Firebase." : c === "auth/network-request-failed" ? "Немає інтернету." : "Увійти не вдалося. Спробуй ще раз.");
+    });
+    return "n";
+  },
+  signout(){ if (auth) auth.signOut(); return "n"; },
+  newChar(){ DB.draft = { step:0, d:clone(BLANK), cart:{ m:{}, g:{} }, ab:{ name:"", text:"" } }; persist(); go("wiz"); return "u"; },
+  cont(){ if (DB.draft) go("wiz"); return "u"; },
+  open(cid){ if (!charOf(cid)) return "u"; DB.active = cid; U.exp = null; persist(); go("sheet"); return "u"; },
+  menu(){ go("roster"); return "u"; },
+  delchar(cid){
+    const k = "char." + cid;
+    if (!mine(cid) || !fs) return "u";
+    if (U.confirm !== k) { U.confirm = k; return "u"; }
+    U.confirm = null;
+    if (U.exp && U.exp.cid === cid) U.exp = null;
+    if (DB.active === cid) { DB.active = null; persist(); }
+    fs.collection("chars").doc(cid).delete().catch(() => toast("Видалити не вдалося. Перевір інтернет."));
+    fs.doc("users/" + ME.uid + "/secrets/" + cid).delete().catch(() => {});
+    return "u";
+  },
+  async exp(cid){
+    const c = charOf(cid); if (!c) return "u";
+    U.exp = { cid, noSecret: !!(U.exp && U.exp.cid === cid && U.exp.noSecret), code:"" };
+    if (mine(cid) && !(SEC.ready && SEC.id === cid)) {
+      try { const d = await fs.doc("users/" + ME.uid + "/secrets/" + cid).get(); if (d.exists) c.secret = String((d.data() || {}).text || ""); } catch (_) {}
+    }
+    const code = await encode(expObj(c, U.exp && U.exp.noSecret));
+    if (U.exp && U.exp.cid === cid) U.exp.code = code;
+    return "u";
+  },
+  expclose(){ U.exp = null; return "u"; },
+  copy(){ if (U.exp && U.exp.code) copyText(U.exp.code, "Код скопійовано."); return "n"; },
+  file(){
+    if (!U.exp) return "n";
+    const c = charOf(U.exp.cid); if (!c) return "n";
+    const name = "charnik-" + (String(c.id.callsign || "stalker").replace(/[^\p{L}\p{N}_-]+/gu, "-") || "stalker") + ".json";
+    const data = JSON.stringify({ app:"zona-charnik", v:1, char:expObj(c, U.exp.noSecret) }, null, 1);
+    try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type:"application/json" })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); } catch (_) { toast("Зберегти файл не вдалося. Скопіюй код."); }
+    return "n";
+  },
+  async imp(){
+    if (!ME || !fs) return "u";
+    const txt = val("imp-code").trim(); if (!txt) { toast("Встав код або вибери файл."); return "u"; }
+    let obj;
+    try { obj = txt[0] === "{" ? JSON.parse(txt) : await decode(txt); }
+    catch (err) { toast(err && err.message === "old" ? "Цей браузер не вміє читати стиснутий код. Онови браузер." : "Код не читається. Перевір, що він скопійований повністю."); return "u"; }
+    if (obj && obj.char) obj = obj.char;
+    if (!obj || typeof obj !== "object" || !obj.attrs || !obj.skills) { toast("Це не код персонажа."); return "u"; }
+    const c = migrate(obj);
+    c.cid = fs.collection("chars").doc().id; c.createdAt = c.createdAt || Date.now(); c.updatedAt = Date.now();
+    MY[c.cid] = c; CH[c.cid] = { owner:ME.uid, ownerName:ME.name, updatedAt:c.updatedAt, char:c };
+    saveChar(c.cid);
+    if (c.secret) fs.doc("users/" + ME.uid + "/secrets/" + c.cid).set({ text:String(c.secret), updatedAt:Date.now() }).catch(() => {});
+    clearVal("imp-code"); toast(`Створено з коду: «${c.id.callsign}».`); return "u";
+  },
+
+  /* wizard */
+  wgo(i){
+    const w = DB.draft, n = clamp(num(i), 0, 4);
+    if (n > 0 && !w.d.id.callsign.trim()) { w.step = 0; toast("Спершу впиши позивний."); } else w.step = n;
+    persist(); build(); window.scrollTo(0, 0); return "u";
+  },
+  wnext(){ return ACT.wgo(DB.draft.step + 1); },
+  wback(){ return ACT.wgo(DB.draft.step - 1); },
+  wcancel(){
+    const w = DB.draft, usedAny = w.d.id.callsign.trim() || attrSpent(w.d) > 5 || skillSpent(w.d) > 0;
+    if (usedAny && U.confirm !== "wcancel") { U.confirm = "wcancel"; toast("Чернетку буде видалено. Натисни ще раз, щоб скасувати створення."); return "u"; }
+    DB.draft = null; persist(); go("roster"); return "u";
+  },
+  wattr(v){
+    const a = v.split("="), d = DB.draft.d, dl = Number(a[1]), left = ATTR_PTS - attrSpent(d), nv = d.attrs[a[0]] + dl;
+    if (nv < 1 || nv > 6 || (dl > 0 && left <= 0)) return "u";
+    d.attrs[a[0]] = nv; d.hp = d.attrs.til * 5 + 10; return "s";
+  },
+  wskill(v){
+    const a = v.split("="), d = DB.draft.d, dl = Number(a[1]), l = num(d.skills[a[0]]), left = SKILL_PTS - skillSpent(d);
+    if (dl > 0 && l + 1 > left) return "u";
+    if (dl < 0 && l <= 0) return "u";
+    d.skills[a[0]] = l + dl; return "s";
+  },
+  wbuy(v){
+    const a = v.split("="), k = a[0].split("."), w = DB.draft, dl = Number(a[1]), cat = k[0] === "g" ? GUNS : MARKET, it = cat[k[1]]; if (!it) return "u";
+    const q = num(w.cart[k[0]][k[1]]), left = w.d.money - cartTotals(w).cost;
+    if (dl > 0 && it.p > left) return "u";
+    if (dl < 0 && q <= 0) return "u";
+    w.cart[k[0]][k[1]] = q + dl; return "s";
+  },
+  wfinish(){
+    const w = DB.draft, d = w.d;
+    if (!d.id.callsign.trim()) { w.step = 0; build(); toast("Спершу впиши позивний."); return "u"; }
+    const t = cartTotals(w);
+    S = d;
+    for (const i in w.cart.m) for (let n = 0; n < num(w.cart.m[i]); n++) addItem(MARKET[i]);
+    for (const i in w.cart.g) for (let n = 0; n < num(w.cart.g[i]); n++) pushGun(GUNS[i]);
+    d.money = d.money - t.cost; d.freeAttr = Math.max(0, ATTR_PTS - attrSpent(d)); d.freeSkill = Math.max(0, SKILL_PTS - skillSpent(d)); d.hp = d.attrs.til * 5 + 10;
+    if (w.ab.name.trim()) d.abilities.push({ id:uid(), name:w.ab.name.trim(), text:w.ab.text.trim() });
+    d.cid = fs.collection("chars").doc().id; d.createdAt = d.updatedAt = Date.now();
+    MY[d.cid] = d; CH[d.cid] = { owner:ME.uid, ownerName:ME.name, updatedAt:d.updatedAt, char:d };
+    DB.active = d.cid; DB.draft = null; U.tab = "sheet"; persist();
+    go("sheet"); saveChar(d.cid); toast("Картку створено. Бонуси від майстра додай через «Правити»."); return "u";
+  },
+
+  /* sheet */
+  inc(p){ step(p, 1); return "s"; },
+  dec(p){ step(p, -1); return "s"; },
+  hp(d){ setHp(S.hp + num(d)); return "s"; },
+  rad(d){ S.rad = clamp(S.rad + num(d), 0, 1000); return "s"; },
+  dmg(){
+    const n = Math.round(num(val("dmg-n"), NaN));
+    if (!(n > 0)) { toast("Впиши, скільки шкоди отримано."); return "u"; }
+    const t = val("dmg-t") || "kin", arm = t === "none" ? 0 : num(S.armor[t]), real = Math.max(0, n - arm);
+    setHp(S.hp - real); clearVal("dmg-n");
+    toast(real ? `−${real} ОЗ` + (arm ? `, броня зняла ${Math.min(arm, n)}.` : ".") : "Броня втримала всю шкоду.");
+    return "s";
+  },
+  bleedTick(){ if (S.bleed > 0) { S.bleed--; setHp(S.hp - 1); } return "s"; },
+  money(sg){
+    const n = Math.round(num(val("money-amt"), NaN));
+    if (!(n > 0)) { toast("Впиши суму."); return "u"; }
+    if (num(sg) < 0 && n > S.money) { toast("Стільки купонів немає."); return "u"; }
+    S.money += n * num(sg); clearVal("money-amt"); return "s";
+  },
+  addMarket(){
+    const m = MARKET[num(val("mk-sel"), -1)]; if (!m) return "u";
+    const buy = $id("mk-buy");
+    if (buy && buy.checked) { if (S.money < m.p) { toast(`Не вистачає купонів: треба ${m.p}.`); return "u"; } S.money -= m.p; toast(`Куплено: ${mName(m)}, −${m.p} куп.`); }
+    else toast(`Додано: ${mName(m)}.`);
+    addItem(m); return "s";
+  },
+  addCustom(){
+    const name = val("ci-name").trim(); if (!name) { toast("Впиши назву речі."); return "u"; }
+    S.items.push({ id:uid(), name, qty:Math.max(1, Math.round(num(val("ci-qty"), 1))), w:Math.max(0, num(val("ci-w"), 0)), note:"" });
+    clearVal("ci-name"); clearVal("ci-qty"); clearVal("ci-w"); return "s";
+  },
+  use(id){
+    const it = S.items.find(x => x.id === id); if (!it || num(it.qty) <= 0) return "u";
+    if (it.fx === "antirad") { it.qty--; S.rad = Math.max(0, S.rad - 250); toast("Антирад: −250 рад."); }
+    else if (it.fx === "vodka") { it.qty--; S.rad = Math.max(0, S.rad - 100); S.vodka = Math.min(9, S.vodka + 1); toast("Горілка: −100 рад, −1 до Мудрості, Реакції, Сприйняття і Спритності."); }
+    else if (it.fx === "sci") { S.rad = Math.max(0, S.rad - 250); useCharge(it); toast("Наукова аптечка: −250 рад, одне використання."); }
+    return "s";
+  },
+  charge(id){ const it = S.items.find(x => x.id === id); if (!it || num(it.qty) <= 0) return "u"; useCharge(it); return "s"; },
+  addArt(){
+    const name = val("art-n").trim(); if (!name) { toast("Впиши назву артефакту."); return "u"; }
+    S.artifacts.push({ id:uid(), name, fx:val("art-fx").trim() }); clearVal("art-n"); clearVal("art-fx"); return "s";
+  },
+  addAbil(){ S.abilities.push({ id:uid(), name:"", text:"" }); return "s"; },
+  del(p){
+    if (U.confirm !== p) { U.confirm = p; return "u"; }
+    U.confirm = null; const a = p.split("."); S[a[0]] = S[a[0]].filter(x => x.id !== a[1]); return "s";
+  },
+  addGun(){
+    const v = val("gun-sel"), buy = $id("gun-buy");
+    const g = v === "" ? { n:"Нова зброя", skill:"rifles", mag:10, dmg:"", modes:"", w:4, cal:"7.62×54", p:0, note:"" } : GUNS[num(v, -1)];
+    if (!g) return "u";
+    if (buy && buy.checked && g.p) { if (S.money < g.p) { toast(`Не вистачає купонів: треба ${g.p}.`); return "u"; } S.money -= g.p; toast(`Куплено: ${g.n}, −${g.p} куп.`); }
+    pushGun(g);
+    if (v === "") { U.edit = true; toast("Впиши назву, шкоду й магазин нижче."); }
+    return "s";
+  },
+  shot(id){
+    const g = S.weapons.find(x => x.id === id); if (!g) return "u";
+    if (num(g.cur) <= 0) { toast("Магазин порожній."); return "u"; }
+    g.cur = num(g.cur) - 1; return "s";
+  },
+  reload(id){
+    const g = S.weapons.find(x => x.id === id); if (!g) return "u";
+    const mag = num(g.mag), need = mag - clamp(num(g.cur), 0, mag); if (need <= 0) { toast("Магазин повний."); return "u"; }
+    const it = S.items.find(x => x.ammo && normCal(x.cal) === normCal(g.cal));
+    if (!it) { g.cur = mag; toast(`Набоїв ${g.cal || "цього калібру"} у рюкзаку немає, запас не списано.`); return "s"; }
+    const take = Math.min(need, num(it.qty)); if (take <= 0) { toast("Набої в рюкзаку скінчилися."); return "u"; }
+    it.qty = num(it.qty) - take; g.cur = num(g.cur) + take; toast(`Заряджено ${take}, у рюкзаку лишилось ${it.qty}.`); return "s";
+  },
+  ct(k){ U.calc[k] = !U.calc[k]; U.roll = null; return "u"; },
+  cs(v){ const a = v.split("="); U.calc[a[0]] = a[1]; U.roll = null; return "u"; },
+  cstep(v){ const a = v.split("="), lim = { rounds:[0,9], jam:[0,2], extra:[-9,9] }[a[0]]; U.calc[a[0]] = clamp(num(U.calc[a[0]]) + Number(a[1]), lim[0], lim[1]); U.roll = null; return "u"; },
+  creset(){ U.calc = clone(CALC0); U.roll = null; return "u"; },
+  mask(){ S.armor.mask = !S.armor.mask; U.roll = null; return "s"; },
+  roll(){ const m = calcM(fx()), r = d10(); U.roll = { r, M:m.M, hit:r + m.M >= 9, eye:m.eye, rb:m.rb, r2:null }; return "u"; },
+  reroll(){ const o = U.roll; if (!o || o.hit || o.r2 != null) return "u"; o.r2 = d10(); o.hit2 = o.r2 + o.M + o.rb >= 9; return "u"; },
+  edit(){ U.edit = !U.edit; return "u"; },
+  tab(t){ if (!TABS[t] || U.tab === t) return "u"; U.tab = t; U.confirm = null; build(); setHash(t); window.scrollTo(0, 0); return "u"; }
+};
+const CONFIRMS = { del:1, delchar:1, wcancel:1 };
+
+app.addEventListener("click", ev => {
+  const b = ev.target.closest("[data-a]"); if (!b || b.disabled) return;
+  const a = b.dataset.a, fn = ACT[a]; if (!fn) return;
+  if (isRO() && !RO_OK[a]) return;
+  const act = document.activeElement;
+  if (act && act !== b && isField(act)) act.blur();
+  if (!CONFIRMS[a]) U.confirm = null;
+  const done = res => { if (res === "s") touch(); saveUI(); if (res !== "n") renderAll(); };
+  let res;
+  try { res = fn(b.dataset.arg || ""); } catch (err) { toast("Щось пішло не так. Спробуй ще раз."); return; }
+  if (res && typeof res.then === "function") res.then(done, () => { toast("Щось пішло не так. Спробуй ще раз."); renderAll(); }); else done(res);
+});
+app.addEventListener("input", ev => {
+  const t = ev.target;
+  if (!t.dataset || !t.dataset.f || t.type === "checkbox" || t.tagName === "SELECT" || isRO()) return;
+  setField(t);
+  if (t.dataset.f === "secret") { queueSecret(); return; }
+  touch(); renderAll();
+});
+app.addEventListener("change", ev => {
+  const t = ev.target;
+  if (t.id === "imp-file") {
+    const f = t.files && t.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => { const el = $id("imp-code"); if (el) el.value = String(rd.result || ""); toast("Файл прочитано. Натисни «Імпортувати»."); };
+    rd.onerror = () => toast("Файл не читається.");
+    rd.readAsText(f); t.value = ""; return;
+  }
+  if (t.id === "exp-nosec") { if (U.exp) { U.exp.noSecret = t.checked; const cid = U.exp.cid; encode(expObj(charOf(cid), t.checked)).then(code => { if (U.exp && U.exp.cid === cid) { U.exp.code = code; renderAll(); } }); } return; }
+  if (!t.dataset || !t.dataset.f || isRO()) return;
+  if (t.type === "checkbox" || t.tagName === "SELECT") { setField(t); touch(); t.blur(); renderAll(); }
+});
+app.addEventListener("focusout", () => setTimeout(flushDirty, 0));
+app.addEventListener("keydown", ev => {
+  const t = ev.target;
+  if (ev.key === "Enter" && t.dataset && t.dataset.enter) { ev.preventDefault(); const b = app.querySelector(`[data-a="${t.dataset.enter}"]`); if (b) b.click(); }
+});
+window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (U.screen === "sheet" && TABS[h] && h !== U.tab) { U.tab = h; saveUI(); build(); } });
+
+/* ---------- start ---------- */
+load(); loadUI();
+const h0 = location.hash.slice(1); if (TABS[h0]) U.tab = h0;
+build();
+initCloud();
+if (fbErr) renderAll();
+const netChange = () => { if (S && U.screen === "sheet") renderAll(); };
+window.addEventListener("online", netChange); window.addEventListener("offline", netChange);
+})();
+</script>
+
+</body>
+</html>
