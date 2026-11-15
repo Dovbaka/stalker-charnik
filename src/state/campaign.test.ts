@@ -133,6 +133,33 @@ describe("campaign store", () => {
     expect(p.camp.get().catalog.items.length).toBeGreaterThan(0);
   });
 
+  it("gives the compendium and the encounters to the GM alone, and saves encounter edits after a pause", async () => {
+    vi.useFakeTimers();
+    const gm = { uid: "gm1", name: "Майстер" };
+    const x = await (async () => { vi.useRealTimers(); const r = await signedIn(gm, ["gm1"]); vi.useFakeTimers(); return r; })();
+    expect(x.camp.get().npcs.map(e => e.n)).toContain("Бандит (Пацан)");
+    const id = x.camp.createEncounter("Засідка");
+    await vi.advanceTimersByTimeAsync(10);
+    const undo = x.camp.updateEncounter(id, e => { e.name = "Засідка на мосту"; e.round = 2; });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(x.camp.get().encounters[id]).toMatchObject({ name: "Засідка на мосту", round: 2 });
+    expect(x.camp.get().encSync).toBe("ok");
+    undo?.();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(x.camp.get().encounters[id]).toMatchObject({ name: "Засідка", round: 0 });
+    x.camp.removeEncounter(id);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(x.camp.get().encounters[id]).toBeUndefined();
+    vi.useRealTimers();
+
+    // a player gets nothing and cannot write
+    const p = await signedIn();
+    expect(p.camp.get().npcs).toEqual([]);
+    expect(p.camp.createEncounter("Моє")).toBe("");
+    p.camp.updateNpcs(() => []);
+    expect(p.camp.get().npcSync).toBe("ok");
+  });
+
   it("removes my sheet and clears everything on sign-out", async () => {
     const { be, camp } = await signedIn();
     const id = camp.create(sheet("Мій")); await tick();

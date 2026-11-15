@@ -3,7 +3,7 @@
 // (one exception: making an artefact's properties public reveals them on every sheet that holds a copy).
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { produce } from "immer";
-import { navigate } from "../router";
+import { GmFrame } from "./gm/Frame";
 import { DEFAULT_CATALOG, gunGroups, itemGroups, newCatArmor, newCatArtifact, newCatGun, newCatItem, type CatArmor, type CatArtifact, type CatGun, type CatItem, type CatKind } from "../rules/catalog";
 import { ART_FX_INFO, ART_RARITY, ART_TYPES, ITEM_FX_INFO, MOD_CHOICES, MOD_INFO, SKILL_NAME, WEAPON_SKILLS, marketName } from "../rules/data";
 import { itemFxText } from "../rules/character";
@@ -11,7 +11,7 @@ import type { ArtRarity, ArtType, ModKind, SkillKey } from "../rules/types";
 import { FxChips } from "./sheet/PackTab";
 import { useCampaign } from "../state/context";
 import { cx, kg } from "../util";
-import { Area, Box, Btn, Check, Confirm, IconPeople, Lab, NumIn, Text } from "./bits";
+import { Area, Box, Btn, Check, Confirm, Lab, NumIn, Text } from "./bits";
 
 const KINDS: [CatKind, string][] = [["guns", "Зброя"], ["armors", "Броня"], ["items", "Речі"], ["artifacts", "Артефакти"]];
 const RARITY_NAME = Object.fromEntries(ART_RARITY) as Record<string, string>;
@@ -28,7 +28,6 @@ export function GmMenu() {
   // every entry is edited in a dialog over the list, on a draft: a changed group or type would move it in the list
   const [dlg, setDlg] = useState<{ d: Draft; isNew: boolean } | null>(null);
   const cat = st.catalog;
-  const status = st.catalogSync === "err" ? "Не збережено" : st.catalogSync === "saving" ? "Зберігаю" : "";
 
   const remove = (k: CatKind, id: string) => camp.updateCatalog(c => {
     if (k === "guns") c.guns = c.guns.filter(e => e.id !== id);
@@ -115,14 +114,7 @@ export function GmMenu() {
   const empty = !cat[kind].length ? "Тут поки порожньо." : q.trim() ? "Нічого не знайдено." : "";
 
   return (
-    <div className="sc-gm">
-      <header className="top">
-        <div className="who"><h1>Меню майстра</h1><div className="sub">Каталог, з якого гравці беруть речі</div></div>
-        <div className="top-r">
-          <span className={cx("sync", st.catalogSync === "err" && "s-err", st.catalogSync === "saving" && "s-saving")} style={{ visibility: status ? "visible" : "hidden" }}>{status || "·"}</span>
-          <Btn sm className="ib" onClick={() => navigate({ name: "roster" })}><IconPeople />Персонажі</Btn>
-        </div>
-      </header>
+    <GmFrame sec="gm" sub="Каталог, з якого гравці беруть речі" sync={st.catalogSync}>
       <nav className="tabs gmtabs" aria-label="Розділи каталогу">
         {KINDS.map(([k, n]) => (
           <button type="button" key={k} className={cx("tab", kind === k && "on")} aria-current={kind === k ? "page" : undefined} onClick={() => setKind(k)}>
@@ -143,7 +135,7 @@ export function GmMenu() {
         <Confirm sm={false} label="Повернути стандартний каталог" ask="Точно? Усі зміни каталогу зникнуть" title="Повернути стандартний каталог"
           onConfirm={() => camp.updateCatalog(() => structuredClone(DEFAULT_CATALOG))} />
       </div>
-    </div>
+    </GmFrame>
   );
 }
 
@@ -230,7 +222,7 @@ function EntryDialog({ start, isNew, gunGroups, itemGroups, save, remove, close 
 }
 
 /** A group from the list, or a new one typed in. A new entry starts with none chosen. */
-function GroupField({ value, groups, set }: { value: string; groups: string[]; set: (v: string) => void }) {
+export function GroupField({ value, groups, set }: { value: string; groups: string[]; set: (v: string) => void }) {
   const [own, setOwn] = useState(value !== "" && !groups.includes(value));
   return <>
     <Lab name="Група" className="wsm">

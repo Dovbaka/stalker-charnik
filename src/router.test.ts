@@ -6,6 +6,9 @@ describe("routes", () => {
     expect(parseRoute("/")).toEqual({ name: "roster" });
     expect(parseRoute("/new")).toEqual({ name: "new" });
     expect(parseRoute("/gm")).toEqual({ name: "gm" });
+    expect(parseRoute("/gm/npc")).toEqual({ name: "npcs" });
+    expect(parseRoute("/gm/enc")).toEqual({ name: "encs" });
+    expect(parseRoute("/gm/enc/e1")).toEqual({ name: "enc", id: "e1" });
     expect(parseRoute("/c/abc123")).toEqual({ name: "sheet", id: "abc123", tab: "sheet" });
     expect(parseRoute("/c/abc123/combat")).toEqual({ name: "sheet", id: "abc123", tab: "combat" });
   });
@@ -17,7 +20,7 @@ describe("routes", () => {
   });
 
   it("writes the address back the same way", () => {
-    const routes: Route[] = [{ name: "roster" }, { name: "new" }, { name: "gm" }, { name: "sheet", id: "abc123", tab: "sheet" }, { name: "sheet", id: "abc123", tab: "notes" }];
+    const routes: Route[] = [{ name: "roster" }, { name: "new" }, { name: "gm" }, { name: "npcs" }, { name: "encs" }, { name: "enc", id: "e1" }, { name: "sheet", id: "abc123", tab: "sheet" }, { name: "sheet", id: "abc123", tab: "notes" }];
     for (const r of routes) expect(parseRoute(routePath(r))).toEqual(r);
     expect(routePath({ name: "sheet", id: "abc123", tab: "sheet" })).toBe("/c/abc123");
   });

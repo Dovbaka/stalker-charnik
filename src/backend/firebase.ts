@@ -49,5 +49,11 @@ export function firebaseBackend(): Backend {
     deleteSecret: (uid, charId) => deleteDoc(secretRef(uid, charId)),
     watchCatalog: cb => onSnapshot(doc(db, "catalog", "main"), snap => cb(snap.exists() ? snap.data() : null), () => cb(null)),
     saveCatalog: cat => setDoc(doc(db, "catalog", "main"), { ...clean(cat), updatedAt: Date.now() }),
+    watchNpcs: cb => onSnapshot(doc(db, "gm", "npcs"), snap => cb(snap.exists() ? snap.data() : null), () => cb(null)),
+    saveNpcs: list => setDoc(doc(db, "gm", "npcs"), { list: clean(list), updatedAt: Date.now() }),
+    watchEncounters: cb => onSnapshot(collection(db, "encounters"), snap => cb(snap.docs.map(d => ({ id: d.id, data: d.data() }))), () => cb([])),
+    newEncounterId: () => doc(collection(db, "encounters")).id,
+    saveEncounter: enc => { const { id, ...rest } = clean(enc); return setDoc(doc(db, "encounters", id), rest); },
+    deleteEncounter: id => deleteDoc(doc(db, "encounters", id)),
   };
 }

@@ -1,6 +1,7 @@
 // An in-memory stand-in for Firebase: local development (`?demo` in the address) and tests.
 import { blankCharacter, maxHp } from "../rules/character";
 import { GM_FIELDS } from "../roles";
+import { DEMO_NPCS } from "./demoNpcs";
 import type { Backend, CharDoc, RemoteChar, User } from "./types";
 
 export interface MemoryBackend extends Backend {
@@ -22,6 +23,11 @@ export function memoryBackend(opts: { user?: User | null; seed?: boolean; gms?: 
   let catalog: unknown = null;
   const catSubs = new Set<(raw: unknown) => void>();
   const isGM = () => !!current && (opts.gms ?? []).includes(current.uid);
+  let npcs: unknown = opts.seed ? { list: structuredClone(DEMO_NPCS) } : null;
+  const npcSubs = new Set<(raw: unknown) => void>();
+  const encounters = new Map<string, unknown>();
+  const encSubs = new Set<(docs: { id: string; data: unknown }[]) => void>();
+  const emitEnc = () => { const docs = [...encounters].map(([id, data]) => ({ id, data: structuredClone(data) })); encSubs.forEach(cb => cb(docs)); };
   let seq = 0;
 
   if (opts.seed) {
@@ -76,6 +82,23 @@ export function memoryBackend(opts: { user?: User | null; seed?: boolean; gms?: 
     async saveCatalog(cat) {
       if (!isGM()) throw { code: "permission-denied" };
       catalog = structuredClone(cat); catSubs.forEach(cb => cb(structuredClone(catalog)));
+    },
+    // the same as firestore.rules: only the GM reads or writes NPCs and encounters
+    watchNpcs(cb) { npcSubs.add(cb); later(() => cb(isGM() ? structuredClone(npcs) : null)); return () => { npcSubs.delete(cb); }; },
+    async saveNpcs(list) {
+      if (!isGM()) throw { code: "permission-denied" };
+      npcs = { list: structuredClone(list), updatedAt: Date.now() }; npcSubs.forEach(cb => cb(structuredClone(npcs)));
+    },
+    watchEncounters(cb) { encSubs.add(cb); later(() => { if (isGM()) emitEnc(); else cb([]); }); return () => { encSubs.delete(cb); }; },
+    newEncounterId: () => "enc" + ++seq,
+    async saveEncounter(enc) {
+      if (!isGM()) throw { code: "permission-denied" };
+      const { id, ...rest } = structuredClone(enc);
+      encounters.set(id, rest); emitEnc();
+    },
+    async deleteEncounter(id) {
+      if (!isGM()) throw { code: "permission-denied" };
+      encounters.delete(id); emitEnc();
     },
   };
 }

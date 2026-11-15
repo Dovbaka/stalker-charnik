@@ -316,15 +316,15 @@ export interface ShotCalc {
 
 const SHOT_SKILLS = ["rifles", "pistols", "heavy"] as const;
 /** Ranged weapons on the body: the ones the calculator can fire. */
-export const rangedWeapons = (c: Character) => c.weapons.filter(g => g.on && (SHOT_SKILLS as readonly string[]).includes(g.skill));
-const gunOf = (c: Character, o: ShotOpts): Weapon | undefined => (o.weapon ? rangedWeapons(c).find(x => x.id === o.weapon) : undefined);
+export const rangedWeapons = (c: Pick<Character, "weapons">) => c.weapons.filter(g => g.on && (SHOT_SKILLS as readonly string[]).includes(g.skill));
+const gunOf = (c: Pick<Character, "weapons">, o: ShotOpts): Weapon | undefined => (o.weapon ? rangedWeapons(c).find(x => x.id === o.weapon) : undefined);
 export const hasMod = (g: Weapon, kind: Weapon["mods"][number]["kind"]) => g.mods.some(m => m.kind === kind);
 
 /**
  * Chance to draw a weapon quickly: к10 − Спритність must not exceed the weapon skill.
  * A bulky weapon adds 2 to the die, an ergonomic grip takes 2 off.
  */
-export function quickDraw(c: Character, d: Derived, g: Weapon): number {
+export function quickDraw(c: Pick<Character, "skills">, d: { eff: Pick<Derived["eff"], "spr"> }, g: Weapon): number {
   const adj = (hasMod(g, "bulky") ? 2 : 0) - (hasMod(g, "grip") ? 2 : 0);
   return clamp((num(c.skills[g.skill]) + d.eff.spr - adj) / 10, 0, 1);
 }
@@ -333,7 +333,7 @@ export function quickDraw(c: Character, d: Derived, g: Weapon): number {
  * The options as they apply. A picked weapon decides the skill, NATO bonus, jams and fire modes, and a scope or a
  * collimator counts only if the weapon has one.
  */
-export function resolveShot(c: Character, o: ShotOpts): ShotOpts {
+export function resolveShot(c: Pick<Character, "weapons">, o: ShotOpts): ShotOpts {
   const base = { ...o, mods: Array.isArray(o.mods) ? o.mods : [] };
   const g = gunOf(c, base);
   if (!g) return { ...base, weapon: "" };
@@ -346,7 +346,9 @@ export function resolveShot(c: Character, o: ShotOpts): ShotOpts {
     colim: base.colim && hasMod(g, "colim"),
   };
 }
-export function shotCalc(c: Character, d: Derived, o: ShotOpts): ShotCalc {
+/** Who fires: a sheet, or a foe of the GM's encounter (no gas mask, no backstory reroll). */
+export type Shooter = Pick<Character, "skills" | "weapons" | "mask"> & { reroll?: Character["reroll"] };
+export function shotCalc(c: Shooter, d: Pick<Derived, "checkPen">, o: ShotOpts): ShotCalc {
   const parts: [string, number][] = [[SKILL_NAME[o.skill], num(c.skills[o.skill])]];
   const P = (n: string, v: number) => parts.push([n, v]);
   if (o.shot === "quick") P("швидкий постріл", -1);
@@ -405,7 +407,7 @@ export const newMod = (p: ModPreset) => ({ id: uid(), name: p.name, kind: p.kind
 export function addArmor(c: Character, a: CatArmor, id = uid()): void {
   c.armors.push({ id, name: a.n, kin: a.kin, acid: a.acid, fire: a.fire, elec: a.elec, rad: a.rad, w: a.w, countW: true, slots: a.slots, on: false, ...(a.note ? { note: a.note } : {}) });
 }
-export function addGun(c: Character, g: GunEntry = CUSTOM_GUN, id = uid()): void {
+export function addGun(c: Pick<Character, "weapons">, g: GunEntry = CUSTOM_GUN, id = uid()): void {
   c.weapons.push({ id, name: g.n, skill: g.skill, dmg: g.dmg, mag: g.mag, cur: g.mag, modes: g.modes, range: g.range, w: g.w, cal: g.cal, nato: !!g.nato, jams: 0, note: g.note, on: true, mods: (g.mods ?? []).map(k => newMod(modPreset(k))) });
 }
 /** Spends one use of a kit; an emptied kit takes one off the count and opens the next. */
@@ -435,7 +437,7 @@ export function useItem(c: Character, id: string): string {
 }
 const normCal = (s: string) => String(s || "").toLowerCase().replace(/[xх*]/g, "×").replace(/мм|\s/g, "");
 /** Refills the magazine from matching ammunition in the backpack; returns the line to show. */
-export function reload(c: Character, weaponId: string): string {
+export function reload(c: Pick<Character, "weapons" | "items">, weaponId: string): string {
   const g = c.weapons.find(x => x.id === weaponId);
   if (!g) return "";
   const mag = num(g.mag), need = mag - clamp(num(g.cur), 0, mag);

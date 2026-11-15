@@ -1,4 +1,5 @@
 import type { Catalog } from "../rules/catalog";
+import type { Encounter, NpcEntry } from "../rules/npc";
 import type { Character } from "../rules/types";
 
 export interface User { uid: string; name: string }
@@ -41,4 +42,12 @@ export interface Backend {
   /** the GM's catalogue as stored: null until the GM first saves it */
   watchCatalog(cb: (raw: unknown) => void): () => void;
   saveCatalog(cat: Catalog): Promise<void>;
+  /** the GM's NPC compendium (`gm/npcs`), null until there is one; GM only */
+  watchNpcs(cb: (raw: unknown) => void): () => void;
+  saveNpcs(list: NpcEntry[]): Promise<void>;
+  /** the GM's encounters (`encounters/{id}`); GM only */
+  watchEncounters(cb: (docs: { id: string; data: unknown }[]) => void): () => void;
+  newEncounterId(): string;
+  saveEncounter(enc: Encounter): Promise<void>;
+  deleteEncounter(id: string): Promise<void>;
 }

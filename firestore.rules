@@ -30,6 +30,13 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isGM();
     }
+    // The GM's NPC compendium (gm/npcs) and encounters: the GM only. Players never see enemy statblocks.
+    match /gm/{docId} {
+      allow read, write: if isGM();
+    }
+    match /encounters/{encId} {
+      allow read, write: if isGM();
+    }
     // Private notes: the owner only.
     match /users/{uid}/secrets/{charId} {
       allow read, write: if request.auth != null && request.auth.uid == uid;

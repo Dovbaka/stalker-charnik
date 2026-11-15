@@ -5,6 +5,8 @@ import { forViewer } from "./rules/catalog";
 import { navigate, useRoute } from "./router";
 import { useCampaign } from "./state/context";
 import { GmMenu } from "./ui/Gm";
+import { EncounterList, EncounterView } from "./ui/gm/Encounters";
+import { NpcCompendium } from "./ui/gm/Npcs";
 import { Login } from "./ui/Login";
 import { Roster } from "./ui/Roster";
 import { Sheet } from "./ui/Sheet";
@@ -44,6 +46,9 @@ export function App() {
   const cat = forViewer(st.catalog, st.gm);
 
   if (route.name === "gm" && st.gm) return <GmMenu />;
+  if (route.name === "npcs" && st.gm) return <NpcCompendium />;
+  if (route.name === "encs" && st.gm) return <EncounterList />;
+  if (route.name === "enc" && st.gm) return <EncounterView key={route.id} id={route.id} />;
 
   if (route.name === "new") {
     if (!draft) return null;
