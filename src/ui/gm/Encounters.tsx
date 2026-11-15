@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { derive, rangedWeapons, type DamageType } from "../../rules/character";
 import { MOD_INFO } from "../../rules/data";
-import { PROT_KEYS, foeReload, foeReserve, addFoes, addPcs, combatants, endFight, foeDamage, foeHeal, nextTurn, removeCombatant, rollGear, setFoeWeapon, sortInitiative, startFight, type Encounter, type Foe, type NpcEntry } from "../../rules/npc";
+import { PROT_KEYS, foeReload, foeShoot, foeSpare, setFoeAmmo, addFoes, addPcs, combatants, endFight, foeDamage, foeHeal, nextTurn, removeCombatant, rollGear, setFoeWeapon, sortInitiative, startFight, type Encounter, type Foe, type NpcEntry } from "../../rules/npc";
 import { navigate } from "../../router";
 import { useCampaign } from "../../state/context";
 import { clamp, cx, dateStr, num } from "../../util";
@@ -226,7 +226,6 @@ function FoeBox({ foe, entry, up, rea }: { foe: Foe; entry: NpcEntry | undefined
       {foe.weapons.map((g, i) => {
         const mag = num(g.mag), cur = clamp(num(g.cur), 0, mag), jams = num(g.jams);
         const rows = g.slot && entry ? entry[g.slot] : [];
-        const reserve = foeReserve(foe, g);
         const meta = [g.range, g.dmg, g.cal].filter(Boolean).join(" · ");
         return (
           <div className="card" key={g.id}>
@@ -240,9 +239,9 @@ function FoeBox({ foe, entry, up, rea }: { foe: Foe; entry: NpcEntry | undefined
             {mag > 0 && <>
               <div className="row wrapg">
                 <span className="ammo">{cur}/{mag}</span>
-                <Btn onClick={() => { if (cur <= 0) { toast("Магазин порожній."); return; } upF(f => { f.weapons[i].cur = cur - 1; }); }}>Постріл</Btn>
+                <Btn onClick={() => { let msg = ""; upF(f => { msg = foeShoot(f, g.id); }); if (msg) toast(msg); }}>Постріл</Btn>
                 <Btn pri onClick={() => { let msg = ""; upF(f => { msg = foeReload(f, g.id); }); if (msg) toast(msg); }}>Перезарядити</Btn>
-                <span className="hint num">запас {reserve ? num(reserve.qty) : 0}</span>
+                <span className="hint num">запас {foeSpare(foe, g)}</span>
               </div>
               {mag <= 40 && <div className="rounds" aria-hidden="true">{"▮".repeat(cur)}{"▯".repeat(mag - cur)}</div>}
               <KV k={<span className={cx(jams > 0 ? "neg" : "hint")}>{jams >= 3 ? "Клинила: непридатна" : jams > 0 ? `Клинила: −${jams}` : "Клинила"}</span>}>
@@ -259,8 +258,8 @@ function FoeBox({ foe, entry, up, rea }: { foe: Foe; entry: NpcEntry | undefined
           {rollable && <Btn sm title="Зброя, набої й гроші за формулами статблоку" onClick={reroll}>Кинути спорядження</Btn>}
         </div>
         {ammo.map(a => (
-          <KV key={a.id} k={a.name}>
-            <NumIn className="w6 num" label={a.name} value={num(a.qty)} set={v => upF(f => { const x = f.items.find(y => y.id === a.id); if (x) x.qty = Math.round(v); })} />
+          <KV key={a.id} k={<>{a.name}<span className="hint"> з магазинами</span></>}>
+            <NumIn className="w6 num" label={a.name} value={num(a.qty)} set={v => upF(f => { setFoeAmmo(f, a.id, v); })} />
           </KV>
         ))}
         {showMoney && <KV k={`Гроші, ${foe.cur}`}>

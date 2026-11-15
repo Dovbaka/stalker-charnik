@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CATALOG } from "./catalog";
 import { resolveShot, shotCalc, SHOT0 } from "./character";
-import { foeReload, addFoes, addPcs, combatants, endFight, foeDamage, makeFoe, newEncounter, newNpc, nextTurn, npcSkills, readEncounter, readNpcs, removeCombatant, rollFormula, rollGear, setFoeWeapon, sortInitiative, startFight, type NpcEntry } from "./npc";
+import { foeReload, foeShoot, foeSpare, setFoeAmmo, addFoes, addPcs, combatants, endFight, foeDamage, makeFoe, newEncounter, newNpc, nextTurn, npcSkills, readEncounter, readNpcs, removeCombatant, rollFormula, rollGear, setFoeWeapon, sortInitiative, startFight, type NpcEntry } from "./npc";
 
 /** Dice that come up as listed: each number is a к10 result (a к100 or к5 reads the same fraction). */
 const dice = (...d10s: number[]) => { let i = 0; return () => (d10s[i++ % d10s.length] - 1) / 10 + 0.05; };
@@ -71,16 +71,25 @@ describe("foes", () => {
     expect(f.items.find(i => i.cal === "12×70 дріб")?.qty).toBe(24);
   });
 
-  it("reloads from its own rounds and shoots with its own skill", () => {
+  it("counts the loot rounds per shot: magazines are part of them, reloading keeps the total", () => {
+    // ПМм and MP-5; 9×18 20+1 = 21, 9×19 30+1 = 31
     const f = makeFoe(pacan(), DEFAULT_CATALOG, 1, dice(1, 9, 1, 1, 1, 1));
-    const mp5 = f.weapons.find(w => w.name === "MP-5")!;
-    mp5.cur = 10;
-    expect(foeReload(f, mp5.id)).toBe("Заряджено 20, у запасі лишилось 11.");
-    expect(foeReload(f, mp5.id)).toBe("Магазин повний.");
-    // no reserve of a calibre: the magazine stays empty, nothing comes for free
-    const pm = f.weapons.find(w => w.name === "Макаров (ПМм)")!;
-    f.items = f.items.filter(i => i.cal !== "9×18"); pm.cur = 0;
-    expect([foeReload(f, pm.id), pm.cur]).toEqual(["Запасних набоїв немає.", 0]);
+    const mp5 = f.weapons.find(w => w.name === "MP-5")!, pm = f.weapons.find(w => w.name === "Макаров (ПМм)")!;
+    const rounds = (cal: string) => f.items.find(i => i.cal === cal)!.qty;
+    expect([mp5.cur, rounds("9×19"), foeSpare(f, mp5)]).toEqual([30, 31, 1]);
+    for (let i = 0; i < 3; i++) expect(foeShoot(f, mp5.id)).toBe("");
+    expect([mp5.cur, rounds("9×19")]).toEqual([27, 28]);
+    expect(foeReload(f, mp5.id)).toBe("Заряджено 1, у запасі лишилось 0.");
+    expect([mp5.cur, rounds("9×19")]).toEqual([28, 28]);
+    expect(foeReload(f, mp5.id)).toBe("Запасних набоїв немає.");
+    expect(foeReload(f, pm.id)).toBe("Магазин повний.");
+    // the GM types fewer rounds than are loaded: the magazine gives them back
+    setFoeAmmo(f, f.items.find(i => i.cal === "9×19")!.id, 20);
+    expect(mp5.cur).toBe(20);
+    // a calibre the loot does not list: the magazine is all there is, nothing comes for free
+    f.items = f.items.filter(i => i.cal !== "9×18"); pm.cur = 1;
+    expect(foeShoot(f, pm.id)).toBe("");
+    expect([foeShoot(f, pm.id), foeReload(f, pm.id), pm.cur]).toEqual(["Магазин порожній.", "Запасних набоїв немає.", 0]);
     const o = resolveShot(f, { ...SHOT0, weapon: mp5.id });
     // Гвинтівки 2 and MP-5 is NATO, +1
     expect(shotCalc({ ...f, mask: false }, { checkPen: 0 }, o).need).toBe(6);

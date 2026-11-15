@@ -4,7 +4,7 @@
 // Attack rolls stay at the table; only gear, rounds and loot can be rolled here (owner, 2026-11-15).
 // Pure functions: no React, no Firebase. Functions that take a foe or an encounter and return nothing mutate it.
 import { clamp, num, uid } from "../util";
-import { addGun, reload, type DamageType } from "./character";
+import { addGun, type DamageType } from "./character";
 import type { Catalog, CatGun } from "./catalog";
 import { ATTR_KEYS, MOD_INFO, SKILL_KEYS } from "./data";
 import type { AttrKey, Item, ModKind, SkillKey, Weapon } from "./types";
@@ -204,6 +204,7 @@ export function rollGear(f: Foe, e: NpcEntry, cat: Catalog, rnd: () => number = 
     const qty = rollFormula(a.f, rnd);
     if (qty != null) f.items.unshift(ammoItem(a.cal, qty));
   }
+  loadAll(f);
   f.money = rollFormula(e.money, rnd) ?? 0;
 }
 /** Swaps the weapon of one table for another line of it; rounds for a new calibre are rolled if the loot has them. */
@@ -213,10 +214,13 @@ export function setFoeWeapon(f: Foe, e: NpcEntry, cat: Catalog, slot: "side" | "
   const w = foeWeapon(row, cat, slot);
   const i = f.weapons.findIndex(x => x.slot === slot);
   if (i >= 0) f.weapons[i] = w; else f.weapons.splice(slot === "side" ? 0 : f.weapons.filter(x => x.slot === "side").length, 0, w);
-  if (!w.cal || f.items.some(it => it.ammo && normCal(it.cal ?? "") === normCal(w.cal))) return;
-  const a = e.ammo.find(x => normCal(x.cal) === normCal(w.cal));
-  const qty = a ? rollFormula(a.f, rnd) : null;
-  if (qty != null) f.items.unshift(ammoItem(w.cal, qty));
+  if (w.cal && !foeReserve(f, w)) {
+    const a = e.ammo.find(x => sameCal(x.cal, w.cal));
+    const qty = a ? rollFormula(a.f, rnd) : null;
+    if (qty != null) f.items.unshift(ammoItem(w.cal, qty));
+  }
+  // the new magazine is filled from the rounds the foe has
+  if (foeReserve(f, w)) { w.cur = 0; w.cur = Math.min(num(w.mag), foeSpare(f, w)); }
 }
 
 /** A new foe from a statblock, gear rolled. `n` numbers it among foes of the same statblock. */
@@ -239,16 +243,58 @@ export function addFoes(enc: Encounter, e: NpcEntry, cat: Catalog, count: number
   }
   return ids;
 }
-/** Rounds of a weapon's calibre in the foe's reserve. */
-export const foeReserve = (f: Foe, w: Weapon): Item | undefined => (w.cal ? f.items.find(it => it.ammo && normCal(it.cal ?? "") === normCal(w.cal)) : undefined);
-/** Reloads from the reserve only: a foe without rounds of that calibre stays empty, unlike a sheet. Returns the line to show. */
+/* ---------- rounds ----------
+ * The rounds of a calibre in a foe's loot are all it has, magazines included: the GM's tables say rounds are used up
+ * in the fight (owner, 2026-11-15: count them per shot). A shot takes one off the magazine and one off the loot;
+ * reloading moves spare rounds into the magazine and leaves the total as it is. A weapon whose calibre the loot
+ * does not list has only its own magazine and is never refilled for free.
+ */
+const sameCal = (a: string, b: string) => !!a && !!b && normCal(a) === normCal(b);
+/** All rounds of a weapon's calibre the foe has, magazines included. */
+export const foeReserve = (f: Foe, w: Weapon): Item | undefined => (w.cal ? f.items.find(it => it.ammo && sameCal(it.cal ?? "", w.cal)) : undefined);
+/** Rounds of a calibre loaded in the foe's weapons. */
+const loaded = (f: Foe, cal: string) => f.weapons.filter(x => sameCal(x.cal, cal)).reduce((s, x) => s + clamp(num(x.cur), 0, num(x.mag)), 0);
+/** Rounds of a weapon's calibre outside the magazines. */
+export const foeSpare = (f: Foe, w: Weapon): number => { const r = foeReserve(f, w); return r ? Math.max(0, num(r.qty) - loaded(f, w.cal)) : 0; };
+/** Fills every magazine from the rounds the foe has, as far as they go; a calibre the loot does not list stays full. */
+function loadAll(f: Foe): void {
+  for (const w of f.weapons) w.cur = foeReserve(f, w) ? 0 : num(w.mag);
+  for (const w of f.weapons) if (foeReserve(f, w)) w.cur = Math.min(num(w.mag), foeSpare(f, w));
+}
+/** One shot: a round off the magazine and off the loot. Returns a line to show when there is nothing to fire. */
+export function foeShoot(f: Foe, weaponId: string): string {
+  const w = f.weapons.find(x => x.id === weaponId);
+  if (!w) return "";
+  if (num(w.cur) <= 0) return "Магазин порожній.";
+  w.cur = num(w.cur) - 1;
+  const r = foeReserve(f, w);
+  if (r) r.qty = Math.max(0, num(r.qty) - 1);
+  return "";
+}
+/** Reloads from the spare rounds only, leaving the total as it is. Returns the line to show. */
 export function foeReload(f: Foe, weaponId: string): string {
   const w = f.weapons.find(x => x.id === weaponId);
   if (!w) return "";
-  const r = foeReserve(f, w);
-  if (num(w.cur) >= num(w.mag)) return "Магазин повний.";
-  if (!r || num(r.qty) <= 0) return "Запасних набоїв немає.";
-  return reload(f, weaponId).replace("у рюкзаку", "у запасі");
+  const mag = num(w.mag), cur = clamp(num(w.cur), 0, mag);
+  if (cur >= mag) return "Магазин повний.";
+  const spare = foeSpare(f, w);
+  if (!foeReserve(f, w) || spare <= 0) return "Запасних набоїв немає.";
+  const take = Math.min(mag - cur, spare);
+  w.cur = cur + take;
+  return `Заряджено ${take}, у запасі лишилось ${spare - take}.`;
+}
+/** The GM types how many rounds of a calibre the foe has; magazines give back what no longer exists. */
+export function setFoeAmmo(f: Foe, itemId: string, qty: number): void {
+  const it = f.items.find(x => x.id === itemId);
+  if (!it) return;
+  it.qty = Math.max(0, Math.round(qty));
+  let over = loaded(f, it.cal ?? "") - it.qty;
+  for (const w of [...f.weapons].reverse()) {
+    if (over <= 0) break;
+    if (!sameCal(w.cal, it.cal ?? "")) continue;
+    const cut = Math.min(over, num(w.cur));
+    w.cur = num(w.cur) - cut; over -= cut;
+  }
 }
 /** Damage through the foe's protection. Health stops at 0; whether that kills is the GM's call. */
 export function foeDamage(f: Foe, amount: number, type: DamageType): { real: number; absorbed: number } {
